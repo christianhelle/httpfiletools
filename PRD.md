@@ -32,7 +32,7 @@ The first release of `httpfiletools` is **CLI-first**. The priority is a high-qu
 
 ### 2.1 Source system A — HTTP File Runner
 
-`httprunner` is already written in Rust and provides a strong execution foundation. Its published feature set includes:
+`httprunner` is already written in Rust, publishes the `httprunner-core` crate on crates.io, and provides a strong execution foundation. Its published feature set includes:
 
 - parsing and executing `.http` files,
 - multiple-file execution and recursive discovery,
@@ -41,14 +41,15 @@ The first release of `httpfiletools` is **CLI-first**. The priority is a high-qu
 - request/response export,
 - assertions,
 - variables and request variables,
+- environment files and environment selection,
 - built-in dynamic functions,
 - conditional execution via directives such as `@dependsOn` and `@if`,
-- configurable delays,
+- configurable delays and timeout directives,
 - insecure HTTPS support,
 - CLI, TUI, and GUI surfaces,
 - an existing Rust workspace split across `core`, `cli`, `tui`, and `gui`.
 
-The new repository should treat `httprunner` as the primary source of truth for **runtime behavior**, **Rust project patterns**, and the current `.http` execution dialect.
+The new repository should treat `httprunner` as the primary source of truth for **runtime behavior**, **Rust project patterns**, and the current `.http` execution dialect. For MVP, the published `httprunner-core` crate should be consumed directly wherever it already satisfies the required contract.
 
 ### 2.2 Source system B — HTTP File Generator
 
@@ -203,12 +204,14 @@ MVP includes:
 - unified CLI surface,
 - generator subcommand,
 - runner subcommand,
-- shared `.http` parser/data model,
+- shared `.http` parser/data model via `httprunner-core`,
 - deterministic file rendering,
 - reports/logging/export,
 - fixture-driven tests,
 - migration guidance from the source tools,
 - explicit squad/team routing documentation.
+
+Milestones 0 through 3 establish the implementation foundation, but the MVP is not considered **shippable** until Milestone 4 closes the unified CLI, docs, migration, and packaging loop.
 
 ### 9.2 Post-MVP scope
 
@@ -245,8 +248,10 @@ Post-MVP candidates:
 | Markdown/HTML reports | `httprunner` | **Carry forward** | MVP includes markdown and HTML |
 | Export requests/responses | `httprunner` | **Carry forward** | Useful for debugging and audit trails |
 | Delays | `httprunner` | **Carry forward** | Support global and per-request controls |
+| Request timeouts | `httprunner` | **Carry forward** | Preserve `@timeout` and `@connection-timeout` semantics where practical |
 | Assertions | `httprunner` | **Carry forward** | Must remain a first-class runtime concept |
 | Variables and request variables | `httprunner` | **Carry forward** | Required for realistic suites |
+| Environment files | `httprunner` | **Carry forward** | Preserve `http-client.env.json` loading and named environment selection |
 | Built-in functions | `httprunner` | **Carry forward** | Prefer compatibility where reasonable |
 | Conditional execution | `httprunner` | **Carry forward** | Preserve `@dependsOn`/`@if` semantics where possible |
 | Insecure HTTPS mode | `httprunner` | **Carry forward** | Useful in dev/test environments |
@@ -264,7 +269,7 @@ Post-MVP candidates:
 | Custom headers | `httpgenerator` | **Carry forward** | Useful for generated requests |
 | Skip generated headers | `httpgenerator` | **Carry forward** | Preserve escape hatch |
 | Azure scope / tenant auth support | `httpgenerator` | **Carry forward** | Important for Azure-hosted APIs |
-| Output timeout | `httpgenerator` | **Carry forward** | Maintain operational control |
+| Output timeout | `httpgenerator` | **Carry forward** | Applies to generation/file-writing operations rather than runner execution semantics |
 | IntelliJ test generation | `httpgenerator` | **Carry forward if low-friction** | Should be supported if it does not distort the shared parser contract |
 | Telemetry and support key | `httpgenerator` | **Do not copy by default** | Revisit later only with explicit privacy design |
 | Visual Studio extension | `httpgenerator` | **Defer** | Out of MVP |
@@ -277,7 +282,7 @@ Post-MVP candidates:
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| REP-001 | The repository must contain only Rust production code for the new toolchain. | Must |
+| REP-001 | All shipped product binaries and reusable production crates in this repository must be implemented in Rust; CI/workflow files, docs, and release scripts may use standard ecosystem formats and tooling. | Must |
 | REP-002 | The project must be structured as a Rust workspace with clear crate boundaries. | Must |
 | REP-003 | Shared behavior between generator and runner must live in reusable crates rather than binary-specific code. | Must |
 | REP-004 | The repository must contain fixture inputs for OpenAPI specs and `.http` files. | Must |
@@ -285,6 +290,7 @@ Post-MVP candidates:
 | REP-006 | The repository must include documentation sufficient for human and agent onboarding. | Must |
 | REP-007 | Windows, macOS, and Linux must be supported in CI. | Must |
 | REP-008 | Release packaging should target GitHub Releases and `cargo install`. | Should |
+| REP-009 | The repository must consume `httprunner-core` as the canonical `.http` parser/execution foundation for MVP and must not reimplement equivalent runner-core behavior unless a specific gap is documented. | Must |
 
 ### 11.2 Generator requirements
 
@@ -302,7 +308,7 @@ Post-MVP candidates:
 | GEN-010 | The generator must support one or more custom headers added to generated requests. | Must |
 | GEN-011 | The generator must optionally omit generated header parameters. | Must |
 | GEN-012 | The generator must support an explicit authorization header value. | Must |
-| GEN-013 | The generator must support generating files that load the authorization header from an environment variable. | Must |
+| GEN-013 | The generator must support generating files that load the authorization header from an environment variable, including a user-selectable variable name. | Must |
 | GEN-014 | The generator must support Azure scope-based token acquisition and optional tenant selection. | Should |
 | GEN-015 | The generator must support skipping schema validation. | Must |
 | GEN-016 | The generator must render request bodies, path variables, query variables, and header variables in a readable, editable form. | Must |
@@ -312,6 +318,8 @@ Post-MVP candidates:
 | GEN-020 | The generator must fail clearly when remote specs cannot be fetched or parsed. | Must |
 | GEN-021 | The generator must not silently embed secrets into files when an environment-based pattern is requested. | Must |
 | GEN-022 | Generated `.http` output must be parseable by the same project parser used by the runner. | Must |
+
+For MVP planning, **GEN-014**, **GEN-018**, and **GEN-019** are stretch items rather than release gates unless they are later promoted by an explicit product decision.
 
 ### 11.3 Runner requirements
 
@@ -337,14 +345,17 @@ Post-MVP candidates:
 | RUN-018 | The runner must return stable exit codes for success, assertion failure, parse failure, and operational failure. | Must |
 | RUN-019 | The runner should support fail-fast behavior as an optional mode. | Should |
 | RUN-020 | The runner should expose a machine-readable summary format after MVP if not included in MVP. | Could |
+| RUN-021 | The runner must support timeout directives compatible with the current runner dialect, including read-timeout and connection-timeout behavior. | Must |
+| RUN-022 | The runner must execute `.http` files produced by the generator without manual normalization when the generated output stays within the documented MVP contract. | Must |
+| RUN-023 | The runner must support environment-file loading compatible with `http-client.env.json` and named environment selection from the CLI. | Must |
 
 ### 11.4 Shared `.http` language requirements
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| LANG-001 | There must be one canonical parser implementation used by both generator validation and runner execution. | Must |
+| LANG-001 | There must be one canonical parser implementation used by both generator validation and runner execution. For MVP, that canonical parser should come from `httprunner-core` unless a documented gap requires a thin adapter. | Must |
 | LANG-002 | The generator must only emit syntax that the canonical parser supports. | Must |
-| LANG-003 | Line endings and file encoding must be handled in a cross-platform safe way. | Must |
+| LANG-003 | The parser and renderer must accept LF and CRLF inputs safely, and the repository must document a normalized line-ending policy for checked-in fixtures. | Must |
 | LANG-004 | The parser must preserve enough structure to support readable error messages with file/line context. | Must |
 | LANG-005 | The parser must distinguish syntax errors from execution errors. | Must |
 | LANG-006 | The project must maintain compatibility fixtures for known `.http` dialect behaviors that users depend on. | Should |
@@ -358,6 +369,9 @@ Post-MVP candidates:
 | AUTH-003 | Azure scope-based token acquisition should be supported for generation scenarios that fetch protected OpenAPI specs. | Should |
 | AUTH-004 | Secrets must be redacted in human-readable logs/reports by default. | Must |
 | AUTH-005 | Generated files should prefer environment-variable placeholders over hard-coded secrets when the user requests that pattern. | Must |
+| AUTH-006 | If multiple authentication sources or patterns are requested together, the CLI must either enforce a documented precedence order or reject ambiguous combinations explicitly. | Must |
+
+For MVP planning, **AUTH-003** is a stretch item rather than a ship gate unless it is later promoted by an explicit product decision.
 
 ### 11.6 Documentation requirements
 
@@ -413,6 +427,8 @@ httpfiletools generate <spec>
   --dry-run
 ```
 
+`--timeout` in the generator contract refers to generation/file-writing operations, not runner request-execution timeouts.
+
 ### 12.3 `run` subcommand
 
 Proposed baseline:
@@ -423,6 +439,7 @@ httpfiletools run <paths...>
   --verbose
   --pretty-json
   --delay <milliseconds>
+  --env <name>
   --insecure
   --log [file]
   --report [markdown|html]
@@ -446,6 +463,23 @@ httpfiletools run <paths...>
 
 4. **Exit codes must be documented and stable.**
 
+5. **Artifact flags must have deterministic destination semantics.**  
+   If optional-value forms such as `--log`, `--report`, or `--export` are retained, their default locations and naming rules must be documented and testable.
+
+### 12.5 Exit-code baseline
+
+Unless superseded by an explicit ADR or product decision, the CLI should treat the following exit-code contract as the MVP baseline:
+
+| Code | Meaning | Notes |
+|------|---------|-------|
+| `0` | Success | All requested work completed without parse, assertion, or operational failure |
+| `1` | Assertion failure | One or more requests executed but the documented assertions failed |
+| `2` | Usage/input error | Invalid CLI arguments or other user-input problems that prevent a meaningful run |
+| `3` | Parse failure | `.http` or related structured input could not be parsed according to the documented dialect |
+| `4` | Operational/runtime failure | Network, TLS, auth, file-system, or other execution-time failure |
+
+Unexpected internal failures should currently surface as operational/runtime failures until a separate internal-error code is explicitly introduced.
+
 ---
 
 ## 13. Proposed architecture
@@ -456,9 +490,8 @@ Recommended initial layout:
 
 ```text
 crates/
-  core/         # shared .http AST, parser, variables, common errors, redaction
   generator/    # OpenAPI loading, normalization, naming, rendering
-  runner/       # request execution, assertions, reports, export
+  runner/       # thin integration over httprunner-core for reports, export, redaction, and result shaping
   cli/          # clap surface, output formatting, fs/network orchestration
 fixtures/
   openapi/      # input specs for tests
@@ -468,25 +501,28 @@ docs/           # optional supporting docs later
 .squad/         # team routing, charters, decisions
 ```
 
-### 13.2 Crate responsibilities
+`httprunner-core` is a required external dependency and the canonical `.http` foundation for MVP.
 
-#### `core`
+### 13.2 Foundation library and crate responsibilities
+
+#### External foundation — `httprunner-core`
 
 Owns:
 
 - `.http` AST and supporting types,
 - parser,
 - parser diagnostics,
+- request execution,
 - shared variable model,
-- common errors,
-- redaction utilities,
-- text rendering primitives that are not generator-specific.
+- request-variable handling,
+- built-in functions, conditions, delays, timeout directives, and environment-file loading exposed by the published crate,
+- baseline runtime result modeling and common errors provided by the library.
 
 Does **not** own:
 
-- HTTP execution,
 - OpenAPI parsing,
-- CLI formatting.
+- product-specific report/export formatting for this repository,
+- unified CLI ergonomics for this repository.
 
 #### `generator`
 
@@ -501,24 +537,21 @@ Owns:
 
 Does **not** own:
 
-- canonical `.http` parsing,
-- runtime request execution,
+- canonical `.http` parsing or runner execution behavior already provided by `httprunner-core`,
 - terminal formatting decisions.
 
 #### `runner`
 
 Owns:
 
-- HTTP request execution,
-- assertion evaluation,
-- variable capture/extraction,
-- conditional execution,
-- delays,
+- composition over `httprunner-core` for repo-specific execution orchestration,
 - logs, reports, and export artifacts,
-- runtime result modeling.
+- redaction policy and result translation for the unified product,
+- any explicitly documented gap adapters required beyond the published crate.
 
 Does **not** own:
 
+- replacement parser/runtime behavior already available in `httprunner-core`,
 - OpenAPI ingestion,
 - CLI argument parsing,
 - generator-specific rendering policies.
@@ -546,18 +579,16 @@ OpenAPI input
   -> validate/normalize
   -> map operations to internal generation model
   -> render canonical .http text
+  -> parse-back validate with httprunner-core
   -> write files
-  -> optional parse-back validation using core parser
 ```
 
 #### Execution flow
 
 ```text
 .http input
-  -> parse with canonical parser
-  -> resolve variables and directives
-  -> execute requests
-  -> evaluate assertions
+  -> resolve environment selection and runtime options
+  -> parse and execute via httprunner-core
   -> collect summary + artifacts
   -> render console output + reports
 ```
@@ -566,6 +597,7 @@ OpenAPI input
 
 Recommended baseline:
 
+- `httprunner-core` as the required parser/runtime dependency for the canonical `.http` dialect,
 - `clap` for CLI parsing,
 - `reqwest` for HTTP,
 - `serde`, `serde_json`, and `serde_yaml` for data handling,
@@ -602,11 +634,13 @@ The generator design must isolate the OpenAPI crate behind the generator layer s
 For identical inputs and options, generation should be stable across runs with respect to:
 
 - file names,
-- request ordering,
+- file-name collision resolution,
+- request ordering and documented tie-breakers when source order is ambiguous,
+- server/example selection when the source spec offers multiple valid candidates,
 - variable ordering where controllable,
 - header ordering where controllable,
 - rendered section layout,
-- trailing newlines and line endings policy.
+- trailing newlines and the normalized line-ending policy for checked-in fixtures.
 
 ### 13.8 Cross-platform requirements
 
@@ -649,18 +683,21 @@ Golden tests are the key defense against subtle regressions in formatting and co
 Use for:
 
 - end-to-end generator workflows,
+- generate-then-run workflows that exercise the shared parser boundary,
 - runner execution against a mock server,
 - report/export generation,
 - multi-file discovery behavior,
-- environment-variable auth flows.
+- environment-variable auth flows,
+- redaction behavior for logs, reports, and exported artifacts.
 
 #### Compatibility tests
 
 Use for:
 
-- source fixtures imported or derived from `httprunner`,
+- source fixtures imported or derived from `httprunner` / `httprunner-core`,
 - source fixtures imported or derived from `httpgenerator`,
-- generated-file round-tripping through the parser.
+- generated-file round-tripping through the parser,
+- representative generated-file execution through the runner without manual edits.
 
 ### 14.2 CI requirements
 
@@ -680,7 +717,8 @@ No milestone is complete unless:
 1. the relevant crate tests pass,
 2. the CLI examples in docs remain accurate,
 3. generated fixtures are deterministic,
-4. a reviewer validates that crate boundaries were respected.
+4. representative generated outputs round-trip through the parser and execute without manual normalization where applicable,
+5. a reviewer validates that crate boundaries were respected.
 
 ### 14.4 Quality bar for generated files
 
@@ -715,6 +753,7 @@ Where behavior changes, the repo must document:
 
 The new product should preserve:
 
+- direct reuse of `httprunner-core` wherever it already satisfies the MVP contract,
 - `.http` parsing semantics users rely on,
 - runner directives and variable capabilities,
 - reporting and logging value,
@@ -724,18 +763,20 @@ TUI and GUI are not MVP requirements, but the core architecture should avoid blo
 
 ### 15.3 Compatibility principle
 
-Compatibility is strongest when the generator and runner share the same parser and data model. The project should prefer **shared contracts** over compatibility shims whenever possible.
+Compatibility is strongest when the generator and runner share the same parser and data model. For MVP, that shared contract should come from `httprunner-core` rather than a new replacement core. The project should prefer **shared contracts** over compatibility shims whenever possible.
 
 ---
 
 ## 16. Delivery plan and milestones
+
+Milestones 0 through 3 establish the engine and shared contracts. The first **shippable MVP** is only considered complete once Milestone 4 exit criteria are met.
 
 ### Milestone 0 — Foundations
 
 Deliverables:
 
 - workspace skeleton,
-- crate boundaries,
+- crate boundaries and external dependency boundaries,
 - initial ADRs/decisions,
 - fixture directory layout,
 - squad roster and routing,
@@ -751,15 +792,15 @@ Exit criteria:
 
 Deliverables:
 
-- canonical `.http` AST,
-- parser extraction or clean-room parser equivalent,
-- parser diagnostics,
+- `httprunner-core` dependency integration,
+- documented coverage/gap analysis against the PRD runner contract,
+- any thin adapter boundaries needed for generator validation or unified CLI integration,
 - core fixture coverage.
 
 Exit criteria:
 
-- parser passes baseline fixtures,
-- runner and generator crates can depend on the same core types.
+- baseline parser/execution fixtures pass against `httprunner-core`,
+- local crates can depend on the published foundation without reimplementing runner internals.
 
 ### Milestone 2 — Generator MVP
 
@@ -780,9 +821,9 @@ Exit criteria:
 
 Deliverables:
 
-- execution pipeline,
-- variables and assertions,
-- delays and conditions,
+- runner integration pipeline on top of `httprunner-core`,
+- variables, assertions, and environment selection,
+- delays, conditions, and timeouts,
 - logs/reports/export.
 
 Exit criteria:
@@ -790,7 +831,7 @@ Exit criteria:
 - representative suites execute successfully in integration tests,
 - exit codes and reports are stable.
 
-### Milestone 4 — Unified CLI and docs
+### Milestone 4 — Unified CLI, docs, and MVP ship gate
 
 Deliverables:
 
@@ -851,9 +892,9 @@ This repository is intentionally being set up for experiments with different mod
 ### 18.2 Handoff model
 
 1. **Gus defines boundaries before feature code begins.**
-2. **Mike establishes the canonical parser contract.**
+2. **Mike establishes the canonical parser contract by integrating `httprunner-core` and documenting any adapter boundaries.**
 3. **Walt consumes the core contract for generation.**
-4. **Jesse consumes the core contract for execution.**
+4. **Jesse builds the product runner surface on top of `httprunner-core` runtime behavior.**
 5. **Saul integrates generator and runner into the CLI surface.**
 6. **Hank validates each layer with fixtures and end-to-end checks.**
 7. **Scribe records decisions that affect future work.**
@@ -885,7 +926,7 @@ Every non-trivial implementation task should state:
 | Benchmark | Goal | Expected artifact | Primary evaluator |
 |-----------|------|------------------|-------------------|
 | B1: Workspace bootstrap | Create initial Cargo workspace and crate skeleton | compilable scaffold | Gus |
-| B2: Parser baseline | Implement or extract canonical `.http` parser behavior | passing parser fixtures | Mike |
+| B2: Foundation baseline | Adopt `httprunner-core` as the canonical `.http` foundation and document any required adapters | passing fixture coverage + gap note | Mike |
 | B3: Generator golden path | Generate stable `.http` outputs from sample specs | snapshot/golden fixtures | Walt + Hank |
 | B4: Runner end-to-end | Execute fixture suites with assertions and reports | integration test suite | Jesse + Hank |
 | B5: CLI integration | Wire subcommands and user-facing help | usable binary UX | Saul |
@@ -927,7 +968,7 @@ These questions should be resolved in the first implementation phase:
 3. **Unified binary only vs wrapper binaries** — when to add legacy-name compatibility.
 4. **IntelliJ test block strategy** — generator-only templating vs broader test-snippet abstraction.
 5. **Post-MVP TUI/GUI direction** — reuse patterns from `httprunner` vs redesign later.
-6. **Auth abstraction** — whether shared auth helpers belong in `core` or a separate crate.
+6. **Auth abstraction** — whether shared auth helpers belong in `generator`, `cli`, or a thin integration crate around `httprunner-core`.
 
 Unless superseded by explicit decisions, the defaults in this PRD should be treated as the implementation baseline.
 
@@ -937,23 +978,22 @@ Unless superseded by explicit decisions, the defaults in this PRD should be trea
 
 These are suitable first issues/tasks:
 
-1. Create Rust workspace skeleton with `core`, `generator`, `runner`, and `cli` crates.
-2. Import or recreate parser fixtures from `httprunner`.
-3. Define canonical `.http` AST and parser error model.
+1. Create Rust workspace skeleton with `generator`, `runner`, and `cli` crates and wire `httprunner-core`.
+2. Validate `httprunner-core` coverage against the PRD runner contract and record any explicit MVP gaps.
+3. Import parser and runner fixtures from `httprunner` / `httprunner-core`.
 4. Evaluate Rust OpenAPI crates and record a decision.
 5. Create generator snapshot fixtures from representative OpenAPI samples.
 6. Implement deterministic operation naming and file naming rules.
 7. Implement generator output layout modes.
-8. Add parse-back validation for generated outputs.
-9. Port runner assertion handling and variable substitution.
-10. Port conditional execution and delay directives.
-11. Add markdown and HTML report generation.
-12. Design CLI subcommands and stable exit codes.
-13. Write migration notes from `httpgenerator` and `httprunner`.
-14. Establish CI matrix for Windows/macOS/Linux.
+8. Add parse-back validation for generated outputs via `httprunner-core`.
+9. Wire `httprunner-core` variables, assertions, conditions, timeouts, and environment selection into the unified runner surface.
+10. Add markdown and HTML report generation plus export/redaction behavior on top of `httprunner-core`.
+11. Design CLI subcommands, `--env`, and stable exit codes.
+12. Write migration notes from `httpgenerator` and `httprunner`.
+13. Establish CI matrix for Windows/macOS/Linux.
 
 ---
 
 ## 22. Summary
 
-`httpfiletools` should become the Rust-native home for both `.http` generation and execution. The repository must do more than merely hold code: it must provide a clear, stable contract for implementation, review, and AI-assisted experimentation. The architecture, tests, CLI, and squad model should all reinforce the same goal: generated `.http` files that are readable, deterministic, and immediately runnable.
+`httpfiletools` should become the Rust-native home for both `.http` generation and execution. The repository must do more than merely hold code: it must provide a clear, stable contract for implementation, review, and AI-assisted experimentation while reusing `httprunner-core` wherever it already satisfies the runner contract. The architecture, tests, CLI, and squad model should all reinforce the same goal: generated `.http` files that are readable, deterministic, and immediately runnable.
