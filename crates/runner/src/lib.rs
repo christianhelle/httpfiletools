@@ -147,40 +147,30 @@ pub fn format_console_output(results: &ProcessorResults, verbose: bool) -> Strin
     let total_failed: u32 = results.files.iter().map(|file| file.failed_count).sum();
     let total_skipped: u32 = results.files.iter().map(|file| file.skipped_count).sum();
 
-    output.push_str(
-        "Run summary
-",
-    );
-    output.push_str(
-        "===========
-",
-    );
+    output.push_str("Run summary\n");
+    output.push_str("===========\n");
     output.push_str(&format!(
-        "passed={} failed={} skipped={}
-",
+        "passed={} failed={} skipped={}\n",
         total_success, total_failed, total_skipped
     ));
 
     for file in &results.files {
         output.push_str(&format!(
-            "- {} (passed={} failed={} skipped={})
-",
+            "- {} (passed={} failed={} skipped={})\n",
             file.filename, file.success_count, file.failed_count, file.skipped_count
         ));
         if verbose {
             for context in &file.result_contexts {
                 match &context.result {
                     Some(result) => output.push_str(&format!(
-                        "  * {} {} {} [{} ms]
-",
+                        "  * {} {} {} [{} ms]\n",
                         context.request.method,
                         context.request.url,
                         result.status_code,
                         result.duration_ms
                     )),
                     None => output.push_str(&format!(
-                        "  * {} {} skipped
-",
+                        "  * {} {} skipped\n",
                         context.request.method, context.request.url
                     )),
                 }
@@ -466,11 +456,7 @@ fn render_body(body: &str, pretty_json: bool) -> String {
 
 fn write_headers(output: &mut String, headers: &[Header]) {
     for header in headers {
-        output.push_str(&format!(
-            "{}: {}
-",
-            header.name, header.value
-        ));
+        output.push_str(&format!("{}: {}\n", header.name, header.value));
     }
 }
 
