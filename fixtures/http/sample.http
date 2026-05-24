@@ -1,0 +1,7 @@
+@baseUrl = https://example.com
+
+# @name health
+GET {{baseUrl}}/health
+Accept: application/json
+
+HTTP 200

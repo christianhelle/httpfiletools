@@ -1,0 +1,42 @@
+openapi: 3.0.3
+info:
+  title: Petstore
+  version: 1.0.0
+servers:
+  - url: https://petstore.example.com/api
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List pets
+      responses:
+        '200':
+          description: A paged array of pets
+    post:
+      operationId: createPet
+      summary: Create pet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Created
+  /pets/{petId}:
+    get:
+      operationId: getPet
+      summary: Get pet
+      parameters:
+        - in: path
+          name: petId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A pet
