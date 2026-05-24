@@ -12,16 +12,16 @@
 
 `httpfiletools` is a new Rust-native product that combines two existing tool lines into a single coherent workspace:
 
-1. **HTTP File Runner** (`christianhelle/httprunner`) — parses and executes `.http` files, evaluates assertions, manages variables, and produces logs/reports.
-2. **HTTP File Generator** (`christianhelle/httpgenerator`) — generates `.http` files from OpenAPI specifications, with options for output layout, headers, auth, and IDE-friendly test snippets.
+1. **HTTP File Runner** (`christianhelle/httprunner`) — parses and executes `.http` files, evaluates assertions, manages variables, and produces logs/reports. Published as the Rust crate `httprunner-core`.
+2. **HTTP File Generator** (`christianhelle/httpgenerator`) — generates `.http` files from OpenAPI specifications, with options for output layout, headers, auth, and IDE-friendly test snippets. Rewritten in Rust and published as the `httpgenerator-core` crate.
 
-The new product must preserve the practical value of both tools while removing the split-language maintenance burden. The resulting repository should be suitable for both human development and **repeatable experimentation with multiple models and agent workflows**, which means the product contract, architecture boundaries, and acceptance criteria must be unusually explicit.
+Both source systems are now Rust-based foundation crates. The new product must preserve the practical value of both tools by consuming those foundations directly rather than reimplementing them, and remove the prior split-language and split-maintenance burden. The resulting repository should be suitable for both human development and **repeatable experimentation with multiple models and agent workflows**, which means the product contract, architecture boundaries, and acceptance criteria must be unusually explicit.
 
 The first release of `httpfiletools` is **CLI-first**. The priority is a high-quality Rust workspace with:
 
-- a shared `.http` parsing and data model,
-- a robust **OpenAPI-to-`.http` generator**,
-- a reliable **`.http` runner**,
+- a shared `.http` parsing and data model inherited from `httprunner-core`,
+- a robust **OpenAPI-to-`.http` generator** built directly on `httpgenerator-core`,
+- a reliable **`.http` runner** built directly on `httprunner-core`,
 - deterministic outputs and golden tests,
 - cross-platform support for Windows, macOS, and Linux,
 - documentation and team structure that allow different agents/models to work from the same source of truth.
@@ -53,33 +53,34 @@ The new repository should treat `httprunner` as the primary source of truth for 
 
 ### 2.2 Source system B — HTTP File Generator
 
-`httpgenerator` is written in C# and currently provides:
+`httpgenerator` has been rewritten in Rust and publishes the `httpgenerator-core` crate. It owns the OpenAPI-to-`.http` generation engine, including:
 
 - local-file and URL-based OpenAPI input,
-- output directory selection,
-- output layout selection (`OneRequestPerFile`, `OneFile`, `OneFilePerTag`),
-- optional validation skipping,
-- authorization headers,
-- loading authorization headers from environment variables,
+- OpenAPI parsing, normalization, and operation naming,
+- output layout selection equivalent to `OneRequestPerFile`, `OneFile`, and `OneFilePerTag`,
+- literal and environment-variable authorization headers,
 - custom header injection,
 - content-type overrides,
 - base URL overrides,
-- Azure scope and tenant-based token acquisition,
-- output timeouts,
-- optional IntelliJ test block generation,
-- optional omission of generated headers,
-- a Visual Studio extension and CLI.
+- skipping generated headers,
+- per-request timeout metadata,
+- IntelliJ/REST Client test block generation,
+- in-memory rendering of generated files exposed via a `generate_http_files` entry point that returns a `GeneratorResult { files: Vec<HttpFile> }` with `HttpFile { filename, content }` so the consumer owns file-system writes.
 
-The new repository should treat `httpgenerator` as the primary source of truth for **generation behavior and CLI ergonomics**, while intentionally not inheriting its C# implementation or its telemetry pattern by default.
+For MVP, the published `httpgenerator-core` crate should be consumed directly wherever it already satisfies the required contract. This repository must not reimplement OpenAPI loading, normalization, operation naming, request rendering, or layout policy unless a specific gap is documented and an adapter is added behind the generator integration boundary.
+
+Product-layer concerns that remain outside `httpgenerator-core` and stay owned by this repository include: file-system persistence, dry-run semantics, parse-back validation of generated content via `httprunner-core`, Azure scope/tenant token acquisition for protected OpenAPI fetches, `skip-validation` policy, unified CLI ergonomics, redaction policy, and telemetry/support-key wrapper behavior. The legacy C# implementation, the Visual Studio extension, and the historical telemetry pattern are not inherited by default.
 
 ### 2.3 Why a new unified product
 
-The current split creates four kinds of friction:
+Even with both engines now in Rust, splitting their distribution across two product surfaces creates friction:
 
-1. **Language fragmentation** — runner logic lives in Rust while generator logic lives in C#, which increases maintenance cost and blocks shared libraries.
-2. **Behavior drift risk** — generated files and runnable files can diverge unless both tools share a single parser and dialect contract.
-3. **Testing fragmentation** — parity and regression testing must currently span different stacks and tooling.
-4. **Agent friction** — experiments with AI tooling are harder when architecture, contracts, and language ecosystems are inconsistent.
+1. **Inconsistent product UX** — users assemble generation and execution workflows by hand across two separately-released CLIs.
+2. **Behavior drift risk** — generated files and runnable files can diverge unless both tools share one parser/dialect contract and one product-level integration story.
+3. **Testing fragmentation** — parity and regression testing for end-to-end "generate then run" workflows currently spans repos and release cadences.
+4. **Agent friction** — experiments with AI tooling are harder when product scope, contracts, and release surfaces are spread across multiple repositories.
+
+Unifying the product surface on top of `httpgenerator-core` and `httprunner-core` keeps each engine independently maintainable while giving users one coherent CLI, one shared parser/dialect, and one fixture/test surface for parity work.
 
 ---
 
@@ -142,9 +143,9 @@ The following are explicitly **not required for MVP** unless later promoted:
 
 1. Porting the existing Visual Studio extension.
 2. Shipping TUI or GUI parity on day one.
-3. Building a general-purpose OpenAPI SDK/code generator.
+3. Building a general-purpose OpenAPI SDK/code generator (this product consumes `httpgenerator-core`; it does not reimplement an OpenAPI toolchain).
 4. Supporting non-HTTP protocols.
-5. Recreating telemetry/support-key behavior from `httpgenerator`.
+5. Activating an outbound telemetry endpoint in MVP builds. The MVP ships the support-key display and redacted feature/error telemetry envelopes (default-on, disabled by `--no-logging`) with a pluggable sink wired to no remote destination; enabling an endpoint is a deliberate later decision.
 6. Designing a remote SaaS control plane or cloud service.
 7. Building a plugin marketplace before core generation and execution are stable.
 
@@ -200,14 +201,17 @@ The following are explicitly **not required for MVP** unless later promoted:
 
 MVP includes:
 
-- Rust workspace with shared crates,
+- Rust workspace with thin integration crates over `httpgenerator-core` and `httprunner-core`,
 - unified CLI surface,
-- generator subcommand,
-- runner subcommand,
+- generator subcommand backed by `httpgenerator-core`,
+- runner subcommand backed by `httprunner-core`,
 - shared `.http` parser/data model via `httprunner-core`,
-- deterministic file rendering,
-- reports/logging/export,
-- fixture-driven tests,
+- deterministic file rendering inherited from `httpgenerator-core`, with parse-back validation through `httprunner-core` before files are written,
+- product-layer dry-run, file-writing, and result-shaping semantics,
+- Azure scope/tenant token acquisition for protected OpenAPI fetches as a product wrapper around `httpgenerator-core`,
+- reports/logging/export and redaction policy on top of `httprunner-core`,
+- support-key display by default; redacted feature/error telemetry envelopes enabled by default, disabled with `--no-logging`, with no telemetry endpoint enabled in the MVP build and a pluggable sink retained for later activation,
+- fixture-driven tests using a small smoke suite with provenance metadata rather than vendoring the full upstream `httpgenerator-core` corpus,
 - migration guidance from the source tools,
 - explicit squad/team routing documentation.
 
@@ -257,21 +261,21 @@ Post-MVP candidates:
 | Insecure HTTPS mode | `httprunner` | **Carry forward** | Useful in dev/test environments |
 | TUI | `httprunner` | **Defer** | Not part of MVP |
 | GUI | `httprunner` | **Defer** | Not part of MVP |
-| OpenAPI from file | `httpgenerator` | **Carry forward** | Must support local specs |
-| OpenAPI from URL | `httpgenerator` | **Carry forward** | Must support remote specs |
-| Output directory | `httpgenerator` | **Carry forward** | Core generator requirement |
-| Output types | `httpgenerator` | **Carry forward** | One request per file, one file, one file per tag |
-| Skip validation | `httpgenerator` | **Carry forward** | Keep as an escape hatch |
-| Authorization header injection | `httpgenerator` | **Carry forward** | Direct header input supported |
-| Authorization from environment variable | `httpgenerator` | **Carry forward** | Strongly preferred over embedded secrets |
-| Base URL override | `httpgenerator` | **Carry forward** | Needed when specs omit or misuse servers |
-| Content-Type override | `httpgenerator` | **Carry forward** | Preserve current utility |
-| Custom headers | `httpgenerator` | **Carry forward** | Useful for generated requests |
-| Skip generated headers | `httpgenerator` | **Carry forward** | Preserve escape hatch |
-| Azure scope / tenant auth support | `httpgenerator` | **Carry forward** | Important for Azure-hosted APIs |
-| Output timeout | `httpgenerator` | **Carry forward** | Applies to generation/file-writing operations rather than runner execution semantics |
-| IntelliJ test generation | `httpgenerator` | **Carry forward if low-friction** | Should be supported if it does not distort the shared parser contract |
-| Telemetry and support key | `httpgenerator` | **Do not copy by default** | Revisit later only with explicit privacy design |
+| OpenAPI from file | `httpgenerator` | **Inherited from `httpgenerator-core`** | Engine-owned input loading |
+| OpenAPI from URL | `httpgenerator` | **Inherited from `httpgenerator-core`** | Engine-owned input loading |
+| Output directory | `httpgenerator` | **Wrapper/product-layer requirement** | `httpgenerator-core` returns in-memory `HttpFile { filename, content }`; this product owns file-system writes |
+| Output types | `httpgenerator` | **Inherited from `httpgenerator-core`** | One request per file, one file, one file per tag |
+| Skip validation | `httpgenerator` | **Wrapper/product-layer requirement** | Escape hatch surfaced via CLI; routed into `httpgenerator-core` options |
+| Authorization header injection | `httpgenerator` | **Inherited from `httpgenerator-core`** | Direct header input supported |
+| Authorization from environment variable | `httpgenerator` | **Inherited from `httpgenerator-core`** | Strongly preferred over embedded secrets |
+| Base URL override | `httpgenerator` | **Inherited from `httpgenerator-core`** | Needed when specs omit or misuse servers |
+| Content-Type override | `httpgenerator` | **Inherited from `httpgenerator-core`** | Preserved by the engine |
+| Custom headers | `httpgenerator` | **Inherited from `httpgenerator-core`** | Useful for generated requests |
+| Skip generated headers | `httpgenerator` | **Inherited from `httpgenerator-core`** | Preserved by the engine |
+| Azure scope / tenant auth support | `httpgenerator` | **Wrapper/product-layer requirement** | Not owned by `httpgenerator-core`; this product wraps token acquisition before invoking the engine for protected OpenAPI fetches |
+| Output timeout | `httpgenerator` | **Inherited from `httpgenerator-core`** | Per-request timeout metadata exposed by the engine |
+| IntelliJ test generation | `httpgenerator` | **Inherited from `httpgenerator-core`** | Engine generates the test blocks; product surfaces a CLI toggle |
+| Telemetry and support key | `httpgenerator` | **Wrapper/product-layer requirement (forward-compatible)** | Support key shown by default; redacted feature/error telemetry envelopes enabled by default and disabled by `--no-logging`; no telemetry endpoint enabled in MVP builds; pluggable sink retained |
 | Visual Studio extension | `httpgenerator` | **Defer** | Out of MVP |
 
 ---
@@ -291,35 +295,41 @@ Post-MVP candidates:
 | REP-007 | Windows, macOS, and Linux must be supported in CI. | Must |
 | REP-008 | Release packaging should target GitHub Releases and `cargo install`. | Should |
 | REP-009 | The repository must consume `httprunner-core` as the canonical `.http` parser/execution foundation for MVP and must not reimplement equivalent runner-core behavior unless a specific gap is documented. | Must |
+| REP-010 | The repository must consume `httpgenerator-core` as the canonical OpenAPI-to-`.http` generation foundation for MVP and must not reimplement OpenAPI loading, normalization, operation naming, request rendering, or output-layout policy unless a specific gap is documented and isolated behind the generator integration crate. | Must |
+| REP-011 | `httpgenerator-core` and `httprunner-core` must be exact-pinned (`=x.y.z`) in this repository through MVP; upgrades to either core crate are deliberate, snapshot-reviewed events. | Must |
 
 ### 11.2 Generator requirements
 
-| ID | Requirement | Priority |
-|----|-------------|----------|
-| GEN-001 | The generator must accept an OpenAPI input from a local file path. | Must |
-| GEN-002 | The generator must accept an OpenAPI input from a URL. | Must |
-| GEN-003 | The generator must support JSON and YAML source documents. | Must |
-| GEN-004 | The generator must support OpenAPI 3.x and should preserve practical compatibility with Swagger/OpenAPI 2.0 inputs used by the current tool. | Must |
-| GEN-005 | The generator must support `--output` for selecting the output location. | Must |
-| GEN-006 | The generator must support output layout modes equivalent to one-request-per-file, one-file, and one-file-per-tag. | Must |
-| GEN-007 | File names must be deterministic and stable for identical inputs. | Must |
-| GEN-008 | The generator must support `--base-url` as an override when server information is absent or unsuitable. | Must |
-| GEN-009 | The generator must support a default `Content-Type` override. | Must |
-| GEN-010 | The generator must support one or more custom headers added to generated requests. | Must |
-| GEN-011 | The generator must optionally omit generated header parameters. | Must |
-| GEN-012 | The generator must support an explicit authorization header value. | Must |
-| GEN-013 | The generator must support generating files that load the authorization header from an environment variable, including a user-selectable variable name. | Must |
-| GEN-014 | The generator must support Azure scope-based token acquisition and optional tenant selection. | Should |
-| GEN-015 | The generator must support skipping schema validation. | Must |
-| GEN-016 | The generator must render request bodies, path variables, query variables, and header variables in a readable, editable form. | Must |
-| GEN-017 | The generator must include summary and description comments when available. | Must |
-| GEN-018 | The generator must support optional IntelliJ/REST Client style test snippet output. | Should |
-| GEN-019 | The generator must support a preview or dry-run path that avoids partial writes when desired. | Should |
-| GEN-020 | The generator must fail clearly when remote specs cannot be fetched or parsed. | Must |
-| GEN-021 | The generator must not silently embed secrets into files when an environment-based pattern is requested. | Must |
-| GEN-022 | Generated `.http` output must be parseable by the same project parser used by the runner. | Must |
+These requirements describe the product-level generator contract. Items marked **Inherited** are satisfied by `httpgenerator-core` and must not be reimplemented in this repository; items marked **Wrapper** are owned by the `crates/generator/` integration crate and the CLI on top of it.
+
+| ID | Requirement | Source | Priority |
+|----|-------------|--------|----------|
+| GEN-001 | The generator must accept an OpenAPI input from a local file path. | Inherited (`httpgenerator-core`) | Must |
+| GEN-002 | The generator must accept an OpenAPI input from a URL. | Inherited (`httpgenerator-core`) | Must |
+| GEN-003 | The generator must support JSON and YAML source documents. | Inherited (`httpgenerator-core`) | Must |
+| GEN-004 | The generator must support OpenAPI 3.x and should preserve practical compatibility with Swagger/OpenAPI 2.0 inputs to the extent supported by `httpgenerator-core`; gaps must be documented rather than worked around. | Inherited (`httpgenerator-core`) | Must |
+| GEN-005 | The generator must support `--output` for selecting the output location, and must own writing the in-memory `HttpFile` results returned by `httpgenerator-core` to disk. | Wrapper | Must |
+| GEN-006 | The generator must support output layout modes equivalent to one-request-per-file, one-file, and one-file-per-tag. | Inherited (`httpgenerator-core`) | Must |
+| GEN-007 | File names must be deterministic and stable for identical inputs. | Inherited (`httpgenerator-core`) | Must |
+| GEN-008 | The generator must support `--base-url` as an override when server information is absent or unsuitable. | Inherited (`httpgenerator-core`) | Must |
+| GEN-009 | The generator must support a default `Content-Type` override. | Inherited (`httpgenerator-core`) | Must |
+| GEN-010 | The generator must support one or more custom headers added to generated requests. | Inherited (`httpgenerator-core`) | Must |
+| GEN-011 | The generator must optionally omit generated header parameters. | Inherited (`httpgenerator-core`) | Must |
+| GEN-012 | The generator must support an explicit authorization header value. | Inherited (`httpgenerator-core`) | Must |
+| GEN-013 | The generator must support generating files that load the authorization header from an environment variable, including a user-selectable variable name. | Inherited (`httpgenerator-core`) | Must |
+| GEN-014 | The generator must support Azure scope-based token acquisition and optional tenant selection for protected OpenAPI fetches. Token acquisition is product-wrapper behavior; the resulting bearer is passed into `httpgenerator-core` as an authorization header. | Wrapper | Should |
+| GEN-015 | The generator must support skipping schema validation. The CLI flag is wrapper-owned; the behavior is routed into `httpgenerator-core` options. | Wrapper | Must |
+| GEN-016 | The generator must render request bodies, path variables, query variables, and header variables in a readable, editable form. | Inherited (`httpgenerator-core`) | Must |
+| GEN-017 | The generator must include summary and description comments when available. | Inherited (`httpgenerator-core`) | Must |
+| GEN-018 | The generator must support optional IntelliJ/REST Client style test snippet output. | Inherited (`httpgenerator-core`) | Should |
+| GEN-019 | The generator must support a preview or dry-run path that avoids partial writes when desired. Dry-run is product-wrapper behavior implemented by withholding the file-write step on the in-memory `GeneratorResult`. | Wrapper | Should |
+| GEN-020 | The generator must fail clearly when remote specs cannot be fetched or parsed, surfacing the original `httpgenerator-core` diagnostic without flattening it. | Wrapper | Must |
+| GEN-021 | The generator must not silently embed secrets into files when an environment-based pattern is requested. | Inherited (`httpgenerator-core`) | Must |
+| GEN-022 | Generated `.http` output must be parseable by the same project parser used by the runner. The generator integration crate must parse-back every `HttpFile.content` returned by `httpgenerator-core` with `httprunner-core` before writing to disk and must fail the run on parse-back errors. | Wrapper | Must |
 
 For MVP planning, **GEN-014**, **GEN-018**, and **GEN-019** are stretch items rather than release gates unless they are later promoted by an explicit product decision.
+
+Any behavior that appears to require changing OpenAPI loading, normalization, naming, rendering, or layout policy must be raised as a documented gap against `httpgenerator-core`. The default response is to file the gap upstream or add an isolated adapter inside `crates/generator/`, not to rewrite engine behavior locally.
 
 ### 11.3 Runner requirements
 
@@ -490,18 +500,20 @@ Recommended initial layout:
 
 ```text
 crates/
-  generator/    # OpenAPI loading, normalization, naming, rendering
+  generator/    # thin integration over httpgenerator-core: CLI option translation,
+                # Azure token acquisition wrapper, parse-back validation via httprunner-core,
+                # dry-run + file-writing, product result shaping, documented gap adapters only
   runner/       # thin integration over httprunner-core for reports, export, redaction, and result shaping
   cli/          # clap surface, output formatting, fs/network orchestration
 fixtures/
-  openapi/      # input specs for tests
+  openapi/      # small smoke-suite input specs with provenance metadata
   http/         # runnable sample .http files
-  golden/       # expected generated outputs
+  golden/       # expected generated outputs (product-layer snapshots, not a mirror of upstream)
 docs/           # optional supporting docs later
 .squad/         # team routing, charters, decisions
 ```
 
-`httprunner-core` is a required external dependency and the canonical `.http` foundation for MVP.
+`httprunner-core` and `httpgenerator-core` are required external dependencies and the canonical foundations for runner and generator behavior in MVP. Both are exact-pinned during MVP.
 
 ### 13.2 Foundation library and crate responsibilities
 
@@ -524,19 +536,43 @@ Does **not** own:
 - product-specific report/export formatting for this repository,
 - unified CLI ergonomics for this repository.
 
-#### `generator`
+#### External foundation — `httpgenerator-core`
 
 Owns:
 
 - OpenAPI source loading (file/URL),
-- input validation and normalization,
+- OpenAPI parser/crate selection and normalization,
 - operation naming,
-- request template generation,
-- output layout selection,
-- generator-specific settings and result types.
+- request template generation and rendering of `.http` text,
+- output layout selection (one-request-per-file, one-file, one-file-per-tag),
+- file-name determinism rules,
+- header/auth/base-url/content-type/custom-header/skip-headers/per-request-timeout behavior,
+- IntelliJ/REST Client test snippet generation,
+- the in-memory `generate_http_files` entry point that returns `GeneratorResult { files: Vec<HttpFile> }` with `HttpFile { filename, content }`.
 
 Does **not** own:
 
+- file-system writes (the consumer persists the returned `HttpFile` set),
+- dry-run policy,
+- parse-back validation against `httprunner-core`,
+- Azure scope/tenant token acquisition for protected OpenAPI fetches,
+- unified CLI ergonomics, redaction policy, or telemetry behavior for this repository.
+
+#### `generator`
+
+Owns:
+
+- thin integration over `httpgenerator-core`: translating CLI options into `httpgenerator-core` configuration,
+- invoking `generate_http_files` and consuming `GeneratorResult`,
+- parse-back validating each `HttpFile.content` with `httprunner-core` before writing,
+- dry-run semantics and file-system writes for the in-memory engine result,
+- Azure scope/tenant token acquisition wrapper before invoking the engine,
+- product-shaped result types returned to the CLI,
+- any explicitly documented gap adapters required beyond `httpgenerator-core`.
+
+Does **not** own:
+
+- OpenAPI parsing, normalization, operation naming, request rendering, or output-layout policy (those live in `httpgenerator-core`),
 - canonical `.http` parsing or runner execution behavior already provided by `httprunner-core`,
 - terminal formatting decisions.
 
@@ -574,13 +610,17 @@ The CLI crate should be the only layer that knows about terminal UX and command 
 #### Generation flow
 
 ```text
-OpenAPI input
-  -> load/fetch
-  -> validate/normalize
-  -> map operations to internal generation model
-  -> render canonical .http text
-  -> parse-back validate with httprunner-core
-  -> write files
+OpenAPI input (file/URL)
+  -> CLI option translation (crates/generator)
+  -> Azure scope/tenant token acquisition wrapper if requested
+  -> httpgenerator-core::generate_http_files(config)
+       -> load/fetch + validate/normalize
+       -> map operations to internal generation model
+       -> render canonical .http text
+       -> return GeneratorResult { files: Vec<HttpFile { filename, content }> }
+  -> parse-back validate each HttpFile.content with httprunner-core
+  -> dry-run? print plan and stop, else write files to --output
+  -> emit product result to CLI
 ```
 
 #### Execution flow
@@ -597,10 +637,11 @@ OpenAPI input
 
 Recommended baseline:
 
-- `httprunner-core` as the required parser/runtime dependency for the canonical `.http` dialect,
+- `httprunner-core` as the required parser/runtime dependency for the canonical `.http` dialect, exact-pinned (`=x.y.z`) through MVP,
+- `httpgenerator-core` as the required OpenAPI-to-`.http` generation dependency, exact-pinned (`=x.y.z`) through MVP,
 - `clap` for CLI parsing,
-- `reqwest` for HTTP,
-- `serde`, `serde_json`, and `serde_yaml` for data handling,
+- `reqwest` for HTTP work this repository owns directly (e.g., Azure token acquisition); OpenAPI fetching is delegated to `httpgenerator-core`,
+- `serde`, `serde_json`, and `serde_yaml` for data handling this repository owns directly,
 - `thiserror` in library crates,
 - `anyhow` only at binary/application boundaries,
 - `tokio` only where it meaningfully improves correctness or ergonomics,
@@ -608,18 +649,17 @@ Recommended baseline:
 - `assert_cmd` and `predicates` for CLI tests,
 - `wiremock` or `httpmock` for local HTTP test servers.
 
+Bumping either core crate is a deliberate, snapshot-reviewed event: the bump PR must re-run the smoke-suite goldens, surface any wrapper-visible diffs, and is reviewed by Walt (generator) or Jesse (runner) as applicable.
+
 ### 13.5 OpenAPI parser selection
 
-This is an explicit sprint-0 decision point. The chosen Rust crate must be evaluated against:
+OpenAPI parser selection is owned by `httpgenerator-core` and is not a sprint-0 decision for this repository. This product inherits whatever OpenAPI crate `httpgenerator-core` chooses, and benefits from upstream improvements there.
 
-1. OpenAPI 3.x support quality,
-2. practical Swagger/OpenAPI 2.0 migration needs,
-3. support for composed schemas and examples,
-4. maintenance activity,
-5. ergonomics for deterministic rendering,
-6. compatibility with the project’s error-handling style.
+If a concrete OpenAPI-parsing gap is observed (e.g., a spec that the engine rejects but a user reasonably expects to work), the response is:
 
-The generator design must isolate the OpenAPI crate behind the generator layer so it can be replaced if necessary.
+1. document the gap in this repository,
+2. file it upstream against `httpgenerator-core`,
+3. and, only if unavoidable for MVP, add a narrowly-scoped adapter inside `crates/generator/` rather than reimplementing OpenAPI parsing locally.
 
 ### 13.6 Error-handling strategy
 
@@ -631,7 +671,7 @@ The generator design must isolate the OpenAPI crate behind the generator layer s
 
 ### 13.7 Determinism requirements
 
-For identical inputs and options, generation should be stable across runs with respect to:
+`httpgenerator-core` owns the rendering and naming policy that produces stable output for identical inputs and options. The integration crate must not introduce nondeterminism on top of the engine output — wrapper steps (parse-back, dry-run, file write) must preserve byte-for-byte the `HttpFile.content` returned by `httpgenerator-core`. For identical inputs and options, the product must remain stable across runs with respect to:
 
 - file names,
 - file-name collision resolution,
@@ -641,6 +681,8 @@ For identical inputs and options, generation should be stable across runs with r
 - header ordering where controllable,
 - rendered section layout,
 - trailing newlines and the normalized line-ending policy for checked-in fixtures.
+
+If a determinism issue is traced into the engine, it is filed upstream against `httpgenerator-core` rather than patched by post-processing engine output.
 
 ### 13.8 Cross-platform requirements
 
@@ -672,11 +714,11 @@ Use for:
 
 Use for:
 
-- OpenAPI-to-`.http` rendering,
+- product-layer rendering of representative `httpgenerator-core` outputs (wrapper integration, not a mirror of the upstream engine corpus),
 - stable CLI help output where appropriate,
 - representative generated request files.
 
-Golden tests are the key defense against subtle regressions in formatting and compatibility.
+Generator goldens are a **small smoke suite** that pins wrapper behavior (CLI option translation, dry-run, file-write, parse-back integration) using `httpgenerator-core` as the engine. Each golden fixture carries provenance metadata recording the source spec, the exact `httpgenerator-core` version used, and the relevant CLI options. The full upstream `httpgenerator-core` corpus is not vendored; engine-internal rendering regressions are an upstream concern.
 
 #### Integration tests
 
@@ -695,7 +737,7 @@ Use for:
 Use for:
 
 - source fixtures imported or derived from `httprunner` / `httprunner-core`,
-- source fixtures imported or derived from `httpgenerator`,
+- a small smoke set derived from `httpgenerator-core` examples, with provenance metadata; the full upstream corpus is intentionally not vendored,
 - generated-file round-tripping through the parser,
 - representative generated-file execution through the runner without manual edits.
 
@@ -717,8 +759,9 @@ No milestone is complete unless:
 1. the relevant crate tests pass,
 2. the CLI examples in docs remain accurate,
 3. generated fixtures are deterministic,
-4. representative generated outputs round-trip through the parser and execute without manual normalization where applicable,
-5. a reviewer validates that crate boundaries were respected.
+4. representative generated outputs round-trip through `httprunner-core` and execute without manual normalization where applicable,
+5. each generator integration test parse-back validates engine output with `httprunner-core` before any file is considered "shipped" by the test,
+6. a reviewer validates that crate boundaries were respected and that no engine behavior (OpenAPI parsing, normalization, naming, rendering, layout) was reimplemented locally without a documented gap.
 
 ### 14.4 Quality bar for generated files
 
@@ -743,7 +786,7 @@ The new product should preserve the spirit of the existing CLI where practical:
 - familiar auth and base-url options,
 - same general expectation of generated file readability.
 
-Where behavior changes, the repo must document:
+Generation behavior itself is inherited from `httpgenerator-core`, so users moving from the standalone `httpgenerator` CLI should generally see equivalent generated output for equivalent flags. Where the unified CLI differs (e.g., subcommand layout, Azure token handling, dry-run, `--no-logging`), the repo must document:
 
 - what changed,
 - why it changed,
@@ -763,7 +806,7 @@ TUI and GUI are not MVP requirements, but the core architecture should avoid blo
 
 ### 15.3 Compatibility principle
 
-Compatibility is strongest when the generator and runner share the same parser and data model. For MVP, that shared contract should come from `httprunner-core` rather than a new replacement core. The project should prefer **shared contracts** over compatibility shims whenever possible.
+Compatibility is strongest when the generator and runner share the same parser and data model. For MVP, that shared contract comes from `httprunner-core`, and generation behavior comes from `httpgenerator-core`. The project should prefer **shared contracts and upstream fixes** over compatibility shims or local reimplementations whenever possible.
 
 ---
 
@@ -792,30 +835,34 @@ Exit criteria:
 
 Deliverables:
 
-- `httprunner-core` dependency integration,
-- documented coverage/gap analysis against the PRD runner contract,
+- `httprunner-core` and `httpgenerator-core` dependency integration with exact version pins,
+- documented coverage/gap analysis against the PRD runner and generator contracts,
 - any thin adapter boundaries needed for generator validation or unified CLI integration,
-- core fixture coverage.
+- core fixture coverage and provenance metadata convention for generator goldens.
 
 Exit criteria:
 
 - baseline parser/execution fixtures pass against `httprunner-core`,
-- local crates can depend on the published foundation without reimplementing runner internals.
+- the generator integration crate can invoke `httpgenerator-core::generate_http_files` and parse-back validate every returned `HttpFile.content` with `httprunner-core`,
+- local crates can depend on the published foundations without reimplementing runner or generator engine internals.
 
 ### Milestone 2 — Generator MVP
 
 Deliverables:
 
-- OpenAPI loading,
-- output layout modes,
-- header/auth/base-url support,
-- deterministic rendering,
-- snapshot tests.
+- CLI option translation into `httpgenerator-core` configuration,
+- Azure scope/tenant token acquisition wrapper for protected OpenAPI fetches,
+- output layout passthrough,
+- header/auth/base-url passthrough,
+- dry-run and file-writing semantics on top of the in-memory `GeneratorResult`,
+- parse-back validation in the integration crate,
+- smoke-suite snapshot tests with provenance metadata.
 
 Exit criteria:
 
-- sample OpenAPI fixtures generate stable `.http` outputs,
-- generated outputs parse successfully with the canonical parser.
+- sample OpenAPI fixtures generate stable `.http` outputs through `httpgenerator-core`,
+- generated outputs parse successfully with `httprunner-core` before being written,
+- no engine behavior (OpenAPI parsing, naming, rendering, layout) is reimplemented in `crates/generator/`.
 
 ### Milestone 3 — Runner MVP
 
@@ -861,13 +908,15 @@ Candidates:
 
 | Risk | Why it matters | Mitigation |
 |------|----------------|------------|
-| OpenAPI crate maturity in Rust | Generator parity may be blocked by crate limitations | Isolate parser choice behind generator abstractions and evaluate early |
-| Divergent `.http` dialects | Generator output may not run cleanly | Use one canonical parser and add parse-back validation |
+| `httpgenerator-core` gap or regression | Generator parity may be blocked by upstream behavior | Exact-pin the engine, run smoke-suite goldens on every bump, file gaps upstream, and isolate any required adapter behind `crates/generator/` |
+| Divergent `.http` dialects | Generator output may not run cleanly | Parse-back validate every `HttpFile.content` from `httpgenerator-core` with `httprunner-core` before writing |
+| Local re-implementation drift | Wrapper crate accidentally reinvents engine behavior | Reviewer gate explicitly rejects OpenAPI parsing, normalization, naming, rendering, or layout code in `crates/generator/` without a documented gap |
 | Scope creep from runner extras | TUI/GUI and advanced UX could delay MVP | Keep MVP CLI-only and defer secondary surfaces |
-| Auth complexity | Azure/token flows can grow quickly | Keep auth support explicit and narrow for MVP |
-| Determinism drift | Golden tests become noisy and reviews expensive | Define rendering/stability rules early and enforce them with snapshots |
+| Auth complexity | Azure/token flows can grow quickly | Keep Azure token acquisition narrowly scoped to the generator wrapper for protected OpenAPI fetches |
+| Determinism drift | Golden tests become noisy and reviews expensive | Treat engine output as byte-for-byte authoritative; only the wrapper's own side-effects are under our determinism control |
+| Core-crate bumps invisibly change output | Snapshot goldens silently update | Exact-pin both core crates; bump PRs must show diffs and are reviewed by Walt or Jesse as applicable |
 | Windows regressions | Primary user workflows may break silently | Treat Windows as first-class in docs, tests, and path handling |
-| Secret leakage in logs | Security/privacy issue | Redact by default and avoid implicit telemetry |
+| Secret leakage in logs | Security/privacy issue | Redact by default; support-key shown by default; redacted telemetry envelopes default-on but disabled by `--no-logging`; no endpoint enabled in MVP |
 | Agent drift | Different models may invent incompatible solutions | Use this PRD plus squad docs as the implementation contract |
 
 ---
@@ -882,7 +931,7 @@ This repository is intentionally being set up for experiments with different mod
 |-------|------|-------------------|
 | Gus | Tech Lead | workspace topology, architecture, dependency policy, cross-cutting decisions |
 | Mike | Core / Parser Developer | `.http` AST, parser, diagnostics, shared model |
-| Walt | Generator Developer | OpenAPI ingestion, generation, deterministic rendering |
+| Walt | Generator Developer | `httpgenerator-core` integration, CLI option translation, parse-back validation, dry-run/file-writing semantics, Azure token wrapper, generator goldens with provenance |
 | Jesse | Runner Developer | request execution, assertions, conditions, reports, export |
 | Saul | CLI / Integration Developer | command design, user-facing output, fs orchestration, exit codes |
 | Hank | Tester / QA | fixtures, golden tests, integration tests, CI acceptance |
@@ -893,10 +942,10 @@ This repository is intentionally being set up for experiments with different mod
 
 1. **Gus defines boundaries before feature code begins.**
 2. **Mike establishes the canonical parser contract by integrating `httprunner-core` and documenting any adapter boundaries.**
-3. **Walt consumes the core contract for generation.**
+3. **Walt integrates `httpgenerator-core` behind the `crates/generator/` integration seam: CLI option translation, parse-back validation, dry-run, file writing, Azure token wrapper, and documented gap adapters only.**
 4. **Jesse builds the product runner surface on top of `httprunner-core` runtime behavior.**
 5. **Saul integrates generator and runner into the CLI surface.**
-6. **Hank validates each layer with fixtures and end-to-end checks.**
+6. **Hank validates each layer with fixtures and end-to-end checks and curates the generator smoke suite with provenance metadata.**
 7. **Scribe records decisions that affect future work.**
 
 ### 18.3 Required work-packet format
@@ -926,8 +975,8 @@ Every non-trivial implementation task should state:
 | Benchmark | Goal | Expected artifact | Primary evaluator |
 |-----------|------|------------------|-------------------|
 | B1: Workspace bootstrap | Create initial Cargo workspace and crate skeleton | compilable scaffold | Gus |
-| B2: Foundation baseline | Adopt `httprunner-core` as the canonical `.http` foundation and document any required adapters | passing fixture coverage + gap note | Mike |
-| B3: Generator golden path | Generate stable `.http` outputs from sample specs | snapshot/golden fixtures | Walt + Hank |
+| B2: Foundation baseline | Adopt `httprunner-core` and `httpgenerator-core` as canonical foundations with exact version pins; document any required adapters | passing fixture coverage + gap notes | Mike + Walt |
+| B3: Generator integration smoke suite | Wire `httpgenerator-core::generate_http_files`, parse-back validate with `httprunner-core`, write files, and pin behavior with a small smoke suite carrying provenance metadata | snapshot/golden fixtures + provenance | Walt + Hank |
 | B4: Runner end-to-end | Execute fixture suites with assertions and reports | integration test suite | Jesse + Hank |
 | B5: CLI integration | Wire subcommands and user-facing help | usable binary UX | Saul |
 | B6: Migration docs | Explain parity and differences from source tools | docs + examples | Saul + Scribe |
@@ -963,12 +1012,14 @@ The MVP is done when all of the following are true:
 
 These questions should be resolved in the first implementation phase:
 
-1. **OpenAPI crate choice** — which Rust crate gives the best balance of correctness and maintainability?
-2. **Swagger 2 compatibility path** — native support vs conversion step.
-3. **Unified binary only vs wrapper binaries** — when to add legacy-name compatibility.
-4. **IntelliJ test block strategy** — generator-only templating vs broader test-snippet abstraction.
-5. **Post-MVP TUI/GUI direction** — reuse patterns from `httprunner` vs redesign later.
-6. **Auth abstraction** — whether shared auth helpers belong in `generator`, `cli`, or a thin integration crate around `httprunner-core`.
+1. **Swagger 2 compatibility path** — confirm what `httpgenerator-core` supports today and decide whether any conversion step is needed at the wrapper layer.
+2. **Unified binary only vs wrapper binaries** — when to add legacy-name compatibility.
+3. **IntelliJ test block strategy** — confirm `httpgenerator-core`'s test snippet output meets the product bar; surface as a CLI toggle only.
+4. **Post-MVP TUI/GUI direction** — reuse patterns from `httprunner` vs redesign later.
+5. **Auth abstraction** — whether shared auth helpers belong in `crates/generator/`, `cli`, or a thin shared integration crate.
+6. **Telemetry endpoint activation** — when, and under what privacy design, to wire the pluggable telemetry sink to a real destination beyond MVP.
+
+OpenAPI parser selection is no longer an open question for this repository; it is owned by `httpgenerator-core`.
 
 Unless superseded by explicit decisions, the defaults in this PRD should be treated as the implementation baseline.
 
@@ -978,22 +1029,24 @@ Unless superseded by explicit decisions, the defaults in this PRD should be trea
 
 These are suitable first issues/tasks:
 
-1. Create Rust workspace skeleton with `generator`, `runner`, and `cli` crates and wire `httprunner-core`.
+1. Create Rust workspace skeleton with `generator`, `runner`, and `cli` crates and wire `httprunner-core` and `httpgenerator-core` with exact version pins.
 2. Validate `httprunner-core` coverage against the PRD runner contract and record any explicit MVP gaps.
-3. Import parser and runner fixtures from `httprunner` / `httprunner-core`.
-4. Evaluate Rust OpenAPI crates and record a decision.
-5. Create generator snapshot fixtures from representative OpenAPI samples.
-6. Implement deterministic operation naming and file naming rules.
-7. Implement generator output layout modes.
-8. Add parse-back validation for generated outputs via `httprunner-core`.
-9. Wire `httprunner-core` variables, assertions, conditions, timeouts, and environment selection into the unified runner surface.
-10. Add markdown and HTML report generation plus export/redaction behavior on top of `httprunner-core`.
-11. Design CLI subcommands, `--env`, and stable exit codes.
-12. Write migration notes from `httpgenerator` and `httprunner`.
-13. Establish CI matrix for Windows/macOS/Linux.
+3. Validate `httpgenerator-core` coverage against the PRD generator contract and record any explicit MVP gaps.
+4. Import parser and runner fixtures from `httprunner` / `httprunner-core`.
+5. Build a small generator smoke suite from representative OpenAPI samples, with provenance metadata recording engine version and CLI options used.
+6. Implement CLI option translation from `crates/generator/` into `httpgenerator-core` configuration.
+7. Implement the Azure scope/tenant token acquisition wrapper used before invoking `httpgenerator-core` for protected OpenAPI fetches.
+8. Implement dry-run and file-write semantics over `GeneratorResult` returned by `httpgenerator-core`.
+9. Add parse-back validation for generated outputs via `httprunner-core` inside the generator integration crate.
+10. Wire `httprunner-core` variables, assertions, conditions, timeouts, and environment selection into the unified runner surface.
+11. Add markdown and HTML report generation plus export/redaction behavior on top of `httprunner-core`.
+12. Design CLI subcommands, `--env`, `--no-logging`, and stable exit codes.
+13. Wire support-key display and the no-endpoint pluggable telemetry sink defaults.
+14. Write migration notes from `httpgenerator` and `httprunner`.
+15. Establish CI matrix for Windows/macOS/Linux including a core-crate bump verification job.
 
 ---
 
 ## 22. Summary
 
-`httpfiletools` should become the Rust-native home for both `.http` generation and execution. The repository must do more than merely hold code: it must provide a clear, stable contract for implementation, review, and AI-assisted experimentation while reusing `httprunner-core` wherever it already satisfies the runner contract. The architecture, tests, CLI, and squad model should all reinforce the same goal: generated `.http` files that are readable, deterministic, and immediately runnable.
+`httpfiletools` should become the Rust-native home for both `.http` generation and execution. The repository must do more than merely hold code: it must provide a clear, stable contract for implementation, review, and AI-assisted experimentation while consuming `httprunner-core` for execution and `httpgenerator-core` for generation wherever those engines already satisfy the contract. The architecture, tests, CLI, and squad model should all reinforce the same goal: generated `.http` files that are readable, deterministic, and immediately runnable — produced by the upstream engines and integrated, validated, and shipped by this product.
