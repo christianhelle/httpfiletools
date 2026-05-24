@@ -1,0 +1,39 @@
+@baseUrl = https://petstore.example.com/api
+@contentType = application/json
+
+########################
+### Request: GET /pets
+### Summary: List pets
+########################
+
+
+GET {{baseUrl}}/pets
+Content-Type: {{contentType}}
+
+
+#########################
+### Request: POST /pets
+### Summary: Create pet
+#########################
+
+
+POST {{baseUrl}}/pets
+Content-Type: {{contentType}}
+
+{
+  "name": "example"
+}
+
+################################
+### Request: GET /pets/{petId}
+### Summary: Get pet
+################################
+
+### Path Parameter: GetPet_petId
+@GetPet_petId = str
+
+
+GET {{baseUrl}}/pets/{{GetPet_petId}}
+Content-Type: {{contentType}}
+
+

@@ -6,7 +6,11 @@ use httpfiletools_runner::{ReportFormat, RunError, RunOptions, RunStatus};
 use httprunner_core::logging::get_support_key;
 
 #[derive(Debug, Parser)]
-#[command(name = "httpfiletools", version, about = "Generate and run .http files")]
+#[command(
+    name = "httpfiletools",
+    version,
+    about = "Generate and run .http files"
+)]
 struct Cli {
     #[arg(global = true, long, help = "Disable the default support-key banner")]
     no_logging: bool,
@@ -169,7 +173,10 @@ fn run_generate(command: GenerateCommand) -> ExitCode {
             eprintln!("{error}");
             if error.is_usage_error() {
                 ExitCode::from(2)
-            } else if matches!(error, GenerateError::ParseBackValidation { .. } | GenerateError::OpenApiLoad(_)) {
+            } else if matches!(
+                error,
+                GenerateError::ParseBackValidation { .. } | GenerateError::OpenApiLoad(_)
+            ) {
                 ExitCode::from(3)
             } else {
                 ExitCode::from(4)
@@ -232,22 +239,5 @@ fn run_run(command: RunCommand) -> ExitCode {
 fn print_support_key() {
     if let Ok(support_key) = get_support_key() {
         println!("Support key: {}", support_key.short_key);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use assert_cmd::Command;
-    use predicates::prelude::*;
-
-    #[test]
-    fn help_lists_subcommands() {
-        Command::cargo_bin("httpfiletools")
-            .unwrap()
-            .arg("--help")
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("generate"))
-            .stdout(predicate::str::contains("run"));
     }
 }

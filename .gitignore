@@ -5,3 +5,11 @@
 .squad/sessions/
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
+
+# Rust build outputs and generated artifacts
+target/
+httprunner-report-*.md
+httprunner-report-*.html
+
+# Rust build outputs
+target/

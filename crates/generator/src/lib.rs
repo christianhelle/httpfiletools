@@ -5,8 +5,8 @@ use std::{
 };
 
 use httpgenerator_core::{
-    GeneratorSettings, NormalizedOpenApiDocument, OutputType, classify_source,
-    generate_http_files, load_and_normalize_document_with_options, openapi::OpenApiSource,
+    GeneratorSettings, NormalizedOpenApiDocument, OutputType, generate_http_files,
+    openapi::{OpenApiSource, classify_source, load_and_normalize_document_with_options},
     redact_authorization_headers,
 };
 use httprunner_core::parser::parse_http_content;
@@ -99,7 +99,9 @@ pub struct GenerateResult {
 pub enum GenerateError {
     #[error("OpenAPI source must not be empty")]
     EmptySource,
-    #[error("cannot combine --authorization-header with --load-authorization-header-from-environment")]
+    #[error(
+        "cannot combine --authorization-header with --load-authorization-header-from-environment"
+    )]
     AmbiguousAuthorization,
     #[error("environment variable '{0}' is not set")]
     MissingAuthorizationEnvironment(String),
@@ -134,7 +136,8 @@ pub fn generate(options: &GenerateOptions) -> Result<GenerateResult, GenerateErr
     if options.spec.trim().is_empty() {
         return Err(GenerateError::EmptySource);
     }
-    if options.authorization_header.is_some() && options.load_authorization_header_from_environment {
+    if options.authorization_header.is_some() && options.load_authorization_header_from_environment
+    {
         return Err(GenerateError::AmbiguousAuthorization);
     }
     if options.azure_scope.is_some() || options.azure_tenant_id.is_some() {
@@ -163,9 +166,11 @@ pub fn generate(options: &GenerateOptions) -> Result<GenerateResult, GenerateErr
     let mut files = Vec::with_capacity(generated.files.len());
 
     for file in generated.files {
-        parse_http_content(&file.content, None).map_err(|error| GenerateError::ParseBackValidation {
-            filename: file.filename.clone(),
-            message: error.to_string(),
+        parse_http_content(&file.content, None).map_err(|error| {
+            GenerateError::ParseBackValidation {
+                filename: file.filename.clone(),
+                message: error.to_string(),
+            }
         })?;
 
         let destination = options.output.join(&file.filename);
@@ -201,9 +206,9 @@ fn literal_generated_authorization(options: &GenerateOptions) -> Option<String> 
 fn resolve_fetch_authorization(options: &GenerateOptions) -> Result<Option<String>, GenerateError> {
     if options.load_authorization_header_from_environment {
         let variable_name = options.authorization_header_variable_name.as_str();
-        return env::var(variable_name)
-            .map(Some)
-            .map_err(|_| GenerateError::MissingAuthorizationEnvironment(variable_name.to_string()));
+        return env::var(variable_name).map(Some).map_err(|_| {
+            GenerateError::MissingAuthorizationEnvironment(variable_name.to_string())
+        });
     }
 
     Ok(options.authorization_header.clone())
@@ -248,10 +253,12 @@ fn load_protected_remote_document(
             message: error.to_string(),
         })?;
 
-    let body = response.text().map_err(|error| GenerateError::RemoteFetch {
-        url: url.clone(),
-        message: error.to_string(),
-    })?;
+    let body = response
+        .text()
+        .map_err(|error| GenerateError::RemoteFetch {
+            url: url.clone(),
+            message: error.to_string(),
+        })?;
 
     let suffix = Path::new(url.path())
         .extension()
@@ -261,8 +268,11 @@ fn load_protected_remote_document(
     let file = Builder::new().suffix(&suffix).tempfile()?;
     fs::write(file.path(), body)?;
 
-    load_and_normalize_document_with_options(&file.path().to_string_lossy(), options.skip_validation)
-        .map_err(|error| GenerateError::OpenApiLoad(error.to_string()))
+    load_and_normalize_document_with_options(
+        &file.path().to_string_lossy(),
+        options.skip_validation,
+    )
+    .map_err(|error| GenerateError::OpenApiLoad(error.to_string()))
 }
 
 #[cfg(test)]
@@ -277,6 +287,12 @@ mod tests {
             .join(name)
             .to_string_lossy()
             .into_owned()
+    }
+
+    fn golden(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/golden")
+            .join(name)
     }
 
     #[test]
@@ -313,5 +329,22 @@ mod tests {
         assert!(result.files.iter().all(|file| file.destination.exists()));
         let first = fs::read_to_string(&result.files[0].destination).unwrap();
         assert!(first.contains("https://petstore.example.com/api"));
+    }
+
+    #[test]
+    fn matches_committed_one_file_golden() {
+        let temp = tempfile::tempdir().unwrap();
+        let options = GenerateOptions {
+            spec: fixture("petstore.yaml"),
+            output: temp.path().join("generated"),
+            output_type: GenerateOutputType::OneFile,
+            ..GenerateOptions::default()
+        };
+
+        let result = generate(&options).unwrap();
+        let actual = fs::read_to_string(&result.files[0].destination).unwrap();
+        let expected = fs::read_to_string(golden("petstore-one-file.http")).unwrap();
+
+        assert_eq!(actual, expected);
     }
 }

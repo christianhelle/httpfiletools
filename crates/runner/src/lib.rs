@@ -8,7 +8,7 @@ use httprunner_core::{
     parser::parse_http_file,
     processor::{ProcessorConfig, format_json_if_valid, process_http_files_with_silent},
     report::{generate_html, generate_markdown},
-    types::{Header, HttpFileResults, HttpResult, ProcessorResults, RequestContext},
+    types::{Header, HttpResult, ProcessorResults, RequestContext},
 };
 use serde_json::Value;
 use thiserror::Error;
@@ -90,14 +90,12 @@ pub fn run(options: &RunOptions) -> Result<RunResult, RunError> {
     }
 
     for file in &files {
-        parse_http_file(
-            &file.to_string_lossy(),
-            options.environment.as_deref(),
-        )
-        .map_err(|error| RunError::Parse {
-            file: file.clone(),
-            message: error.to_string(),
-        })?;
+        parse_http_file(&file.to_string_lossy(), options.environment.as_deref()).map_err(
+            |error| RunError::Parse {
+                file: file.clone(),
+                message: error.to_string(),
+            },
+        )?;
     }
 
     let results = if options.fail_fast {
@@ -113,7 +111,10 @@ pub fn run(options: &RunOptions) -> Result<RunResult, RunError> {
         None
     };
     let log_path = if let Some(path) = &options.log {
-        fs::write(path, format_console_output(&redacted_results, options.verbose))?;
+        fs::write(
+            path,
+            format_console_output(&redacted_results, options.verbose),
+        )?;
         Some(path.clone())
     } else {
         None
@@ -146,10 +147,14 @@ pub fn format_console_output(results: &ProcessorResults, verbose: bool) -> Strin
     let total_failed: u32 = results.files.iter().map(|file| file.failed_count).sum();
     let total_skipped: u32 = results.files.iter().map(|file| file.skipped_count).sum();
 
-    output.push_str("Run summary
-");
-    output.push_str("===========
-");
+    output.push_str(
+        "Run summary
+",
+    );
+    output.push_str(
+        "===========
+",
+    );
     output.push_str(&format!(
         "passed={} failed={} skipped={}
 ",
@@ -168,7 +173,10 @@ pub fn format_console_output(results: &ProcessorResults, verbose: bool) -> Strin
                     Some(result) => output.push_str(&format!(
                         "  * {} {} {} [{} ms]
 ",
-                        context.request.method, context.request.url, result.status_code, result.duration_ms
+                        context.request.method,
+                        context.request.url,
+                        result.status_code,
+                        result.duration_ms
                     )),
                     None => output.push_str(&format!(
                         "  * {} {} skipped
@@ -234,7 +242,10 @@ fn execute_batch(files: &[PathBuf], options: &RunOptions) -> Result<ProcessorRes
     process_http_files_with_silent(&config).map_err(|error| RunError::Runtime(error.to_string()))
 }
 
-fn execute_fail_fast(files: &[PathBuf], options: &RunOptions) -> Result<ProcessorResults, RunError> {
+fn execute_fail_fast(
+    files: &[PathBuf],
+    options: &RunOptions,
+) -> Result<ProcessorResults, RunError> {
     let mut aggregated = ProcessorResults {
         success: true,
         files: Vec::new(),
@@ -413,23 +424,19 @@ fn sanitize(value: &str) -> String {
 }
 
 fn render_request(context: &RequestContext, pretty_json: bool) -> String {
-    let mut output = format!("{} {}
-", context.request.method, context.request.url);
+    let mut output = format!("{} {}\n", context.request.method, context.request.url);
     write_headers(&mut output, &context.request.headers);
-    output.push('
-');
+    output.push('\n');
     if let Some(body) = &context.request.body {
         output.push_str(&render_body(body, pretty_json));
-        output.push('
-');
+        output.push('\n');
     }
     output
 }
 
 fn render_response(context: &RequestContext, pretty_json: bool) -> String {
     let result = context.result.as_ref().expect("checked before call");
-    let mut output = format!("HTTP/1.1 {}
-", result.status_code);
+    let mut output = format!("HTTP/1.1 {}\n", result.status_code);
     if let Some(headers) = &result.response_headers {
         let mut values: Vec<Header> = headers
             .iter()
@@ -441,12 +448,10 @@ fn render_response(context: &RequestContext, pretty_json: bool) -> String {
         values.sort_by(|left, right| left.name.cmp(&right.name));
         write_headers(&mut output, &values);
     }
-    output.push('
-');
+    output.push('\n');
     if let Some(body) = &result.response_body {
         output.push_str(&render_body(body, pretty_json));
-        output.push('
-');
+        output.push('\n');
     }
     output
 }
@@ -461,21 +466,48 @@ fn render_body(body: &str, pretty_json: bool) -> String {
 
 fn write_headers(output: &mut String, headers: &[Header]) {
     for header in headers {
-        output.push_str(&format!("{}: {}
-", header.name, header.value));
+        output.push_str(&format!(
+            "{}: {}
+",
+            header.name, header.value
+        ));
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::PathBuf};
+    use std::{
+        fs,
+        io::{Read, Write},
+        net::TcpListener,
+        thread,
+    };
 
     use super::{ReportFormat, RunOptions, RunStatus, format_console_output, run};
 
-    fn fixture(name: &str) -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../fixtures/http")
-            .join(name)
+    fn sample_http(url: &str) -> String {
+        format!("GET {url}/health\nAccept: application/json\n\nHTTP 200\n")
+    }
+
+    fn start_server() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buffer = [0_u8; 1024];
+                let _ = stream.read(&mut buffer);
+                let response = concat!(
+                    "HTTP/1.1 200 OK\r\n",
+                    "Content-Type: application/json\r\n",
+                    "Content-Length: 15\r\n",
+                    "Connection: close\r\n",
+                    "\r\n",
+                    "{\"ok\": true}\r\n"
+                );
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+        format!("http://{}", address)
     }
 
     #[test]
@@ -489,7 +521,8 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let nested = temp.path().join("nested");
         fs::create_dir_all(&nested).unwrap();
-        fs::copy(fixture("sample.http"), nested.join("sample.http")).unwrap();
+        let url = start_server();
+        fs::write(nested.join("sample.http"), sample_http(&url)).unwrap();
 
         let result = run(&RunOptions {
             paths: vec![temp.path().to_path_buf()],
@@ -505,9 +538,12 @@ mod tests {
     fn writes_log_and_report() {
         let temp = tempfile::tempdir().unwrap();
         let log_path = temp.path().join("run.log");
+        let http_path = temp.path().join("sample.http");
+        let url = start_server();
+        fs::write(&http_path, sample_http(&url)).unwrap();
 
         let result = run(&RunOptions {
-            paths: vec![fixture("sample.http")],
+            paths: vec![http_path],
             log: Some(log_path.clone()),
             report: Some(ReportFormat::Markdown),
             ..RunOptions::default()
@@ -516,7 +552,9 @@ mod tests {
 
         assert_eq!(result.status, RunStatus::Success);
         assert!(log_path.exists());
-        assert!(result.report_path.unwrap().exists());
+        let report_path = result.report_path.unwrap();
+        assert!(report_path.exists());
         assert!(format_console_output(&result.results, false).contains("Run summary"));
+        fs::remove_file(report_path).unwrap();
     }
 }
