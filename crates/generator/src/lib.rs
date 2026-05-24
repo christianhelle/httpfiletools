@@ -223,7 +223,12 @@ fn load_document(
 
     match source {
         OpenApiSource::Url(url) if authorization_header.is_some() => {
-            load_protected_remote_document(options, url, authorization_header.expect("checked"))
+            load_protected_remote_document(
+                options,
+                url,
+                authorization_header
+                    .expect("authorization_header is Some when OpenApiSource::Url matches"),
+            )
         }
         _ => load_and_normalize_document_with_options(&options.spec, options.skip_validation)
             .map_err(|error| GenerateError::OpenApiLoad(error.to_string())),

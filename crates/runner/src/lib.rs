@@ -425,7 +425,9 @@ fn render_request(context: &RequestContext, pretty_json: bool) -> String {
 }
 
 fn render_response(context: &RequestContext, pretty_json: bool) -> String {
-    let result = context.result.as_ref().expect("checked before call");
+    let result = context.result.as_ref().expect(
+        "result must be Some because context.result.is_some() was verified in export_results",
+    );
     let mut output = format!("HTTP/1.1 {}\n", result.status_code);
     if let Some(headers) = &result.response_headers {
         let mut values: Vec<Header> = headers

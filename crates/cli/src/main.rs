@@ -237,7 +237,8 @@ fn run_run(command: RunCommand) -> ExitCode {
 }
 
 fn print_support_key() {
-    if let Ok(support_key) = get_support_key() {
-        println!("Support key: {}", support_key.short_key);
+    match get_support_key() {
+        Ok(support_key) => println!("Support key: {}", support_key.short_key),
+        Err(error) => eprintln!("Warning: failed to load support key: {error}"),
     }
 }
