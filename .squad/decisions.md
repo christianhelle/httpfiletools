@@ -97,6 +97,26 @@
 **What:** Use `httprunner-core = "0.9.51"` with its default features enabled in the initial workspace foundation.
 **Why:** Disabling default features caused upstream compile errors in `telemetry::tracking`; keeping defaults preserves compatibility with the published crate and keeps the workspace buildable.
 
+### 2026-05-25T23:05:30.184+02:00: Runner file-level core semantics
+**By:** Livingston
+**What:** `httpfiletools run` file execution should wrap `httprunner_core::processor::{ProcessorConfig, process_http_files_with_config/process_http_files_with_silent}` rather than locally orchestrating `parse_http_file` plus `execute_http_request`, because parser/runner calls are only low-level seams and bypass dependencies, conditions, variable/function substitution, delays, logging, and aggregate `ProcessorResults`.
+**Why:** This preserves upstream `.http` file semantics from `httprunner-core 0.9.51` while keeping core behavior upstream-owned.
+
+### 2026-05-25T23:05:30.184+02:00: Generator wrapper core seam
+**By:** Livingston
+**What:** `httpfiletools generate` should remain a thin wrapper around `httpgenerator_core::openapi::load_and_normalize_document` (or `_with_options` only when exposing invalid OpenAPI 3.1 tolerance) followed by `httpgenerator_core::generate_http_files`.
+**Why:** This avoids duplicating upstream base URL, naming, headers, sample body, and output grouping behavior.
+
+### 2026-05-25T23:05:30.184+02:00: Stable generate flag subset
+**By:** Livingston
+**What:** The stable initial `generate` subset is `<OPENAPI>`, help/version, `--output`, `--skip-validation`, authorization header/environment controls, content type, base URL, output type, timeout, IntelliJ tests, repeatable custom headers, and skip headers. Defer Azure token acquisition flags, `--no-logging`, and non-upstream `--stdout` until explicit CLI-layer behavior exists.
+**Why:** These options either map cleanly to the current core wrapper or are required CLI writer controls; deferred options require additional product decisions or CLI-layer dependencies.
+
+### 2026-05-25T23:05:30.184+02:00: Compatibility test implementation coverage
+**By:** Yen
+**What:** Compatibility tests now cover golden one-file generation, invalid OpenAPI error wrapping, deterministic local HTTP request execution, and an ignored CLI stdout/stderr/exit-code harness pending final CLI contract.
+**Why:** Default tests should remain deterministic and passing while locking visible orchestration behavior and preparing CLI golden coverage.
+
 ## Governance
 
 - All meaningful changes require team consensus.
