@@ -21,3 +21,5 @@ Yen is responsible for test strategy, fixtures, integration tests, CLI behavior,
 
 - The repository currently has Squad scaffolding but no Rust workspace files yet.
 - Initial test scaffolding should avoid Rust source edits and start with fixture-driven integration tests once `crates/cli` and `crates/core` exist.
+
+- 2026-05-25T23:05:30.184+02:00: Added default-passing compatibility test scaffolding for `add-compat-tests`: core golden generation fixture comparison, invalid OpenAPI error wrapper check, deterministic local HTTP server execution, and ignored CLI stdout/stderr/exit-code golden harness pending final CLI contract.
