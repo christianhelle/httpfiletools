@@ -1,0 +1,53 @@
+{
+  "agents": {
+    "lead-architect": {
+      "persistent_name": "Danny",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-05-25T22:07:44.449+02:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "rust-core-dev": {
+      "persistent_name": "Rusty",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-05-25T22:07:44.449+02:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "cli-dev": {
+      "persistent_name": "Linus",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-05-25T22:07:44.449+02:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "openapi-http-specialist": {
+      "persistent_name": "Livingston",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-05-25T22:07:44.449+02:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "tester-qa": {
+      "persistent_name": "Yen",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-05-25T22:07:44.449+02:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "scribe": {
+      "persistent_name": "Scribe",
+      "universe": "system",
+      "created_at": "2026-05-25T22:07:44.449+02:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "ralph": {
+      "persistent_name": "Ralph",
+      "universe": "system",
+      "created_at": "2026-05-25T22:07:44.449+02:00",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}
