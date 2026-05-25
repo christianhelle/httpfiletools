@@ -43,6 +43,12 @@ pub struct RunOptions {
     pub delay_ms: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportFormat {
+    Markdown,
+    Html,
+}
+
 pub fn run_http_files(request: &RunRequest) -> Result<ProcessorResults> {
     let config = ProcessorConfig::new(&request.files)
         .with_verbose(request.options.verbose)
@@ -63,6 +69,49 @@ pub fn run_http_files(request: &RunRequest) -> Result<ProcessorResults> {
 
 pub fn run(request: &RunRequest) -> Result<ProcessorResults> {
     run_http_files(request)
+}
+
+pub fn discover_http_files() -> Result<Vec<String>> {
+    httprunner_core::discovery::run_discovery_mode().map_err(|source| HttpFileToolsError::Run {
+        files: Vec::new(),
+        source,
+    })
+}
+
+pub fn export_results(results: &ProcessorResults, pretty_json: bool) -> Result<Vec<String>> {
+    let export =
+        httprunner_core::export::export_results(results, pretty_json).map_err(|source| {
+            HttpFileToolsError::Export {
+                operation: "export results",
+                source,
+            }
+        })?;
+
+    if export.failed_file_names.is_empty() {
+        Ok(export.file_names)
+    } else {
+        Err(HttpFileToolsError::ExportFailures {
+            failures: export.failed_file_names,
+        })
+    }
+}
+
+pub fn export_json(results: &ProcessorResults) -> Result<String> {
+    httprunner_core::export::export_json(results).map_err(|source| HttpFileToolsError::Export {
+        operation: "export JSON results",
+        source,
+    })
+}
+
+pub fn generate_report(results: &ProcessorResults, format: ReportFormat) -> Result<String> {
+    match format {
+        ReportFormat::Markdown => httprunner_core::report::generate_markdown(results),
+        ReportFormat::Html => httprunner_core::report::generate_html(results),
+    }
+    .map_err(|source| HttpFileToolsError::Export {
+        operation: "generate report",
+        source,
+    })
 }
 
 pub fn parse_http_file(path: &str, environment_name: Option<&str>) -> Result<Vec<HttpRequest>> {

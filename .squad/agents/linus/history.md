@@ -16,6 +16,7 @@ Linus is responsible for CLI UX, subcommands, flags, packaging, and developer ex
 
 - Team initialized for `httpfiletools`.
 - 2026-05-25T22:07:44.449+02:00: Inspected upstream `httprunner` and `httpgenerator` public READMEs, Rust CLI argument sources, and CLI tests. Prepared the initial compatibility handoff below for the next CLI implementation wave.
+- 2026-05-25T23:05:30.184+02:00: Implemented the initial `httpfiletools generate` and `httpfiletools run` CLI surface in `crates/cli`, wired run execution through core wrapper APIs, and added minimal core wrappers for discovery, reports, and exports. `cargo fmt --all -- --check` and `cargo test --workspace --quiet` pass.
 
 ## Learnings
 

@@ -11,4 +11,5 @@ name = "httpfiletools"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
 httpfiletools-core = { path = "../core" }

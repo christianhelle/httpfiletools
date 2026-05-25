@@ -19,6 +19,13 @@ pub enum HttpFileToolsError {
         files: Vec<String>,
         source: anyhow::Error,
     },
+    Export {
+        operation: &'static str,
+        source: std::io::Error,
+    },
+    ExportFailures {
+        failures: Vec<String>,
+    },
     ExecuteHttpRequest {
         request_name: Option<String>,
         source: anyhow::Error,
@@ -54,6 +61,14 @@ impl fmt::Display for HttpFileToolsError {
                     )
                 }
             }
+            Self::Export { operation, source } => write!(f, "failed to {operation}: {source}"),
+            Self::ExportFailures { failures } => {
+                write!(
+                    f,
+                    "failed to export some request/response files: {}",
+                    failures.join(", ")
+                )
+            }
             Self::ExecuteHttpRequest {
                 request_name,
                 source,
@@ -73,6 +88,8 @@ impl Error for HttpFileToolsError {
             | Self::ParseHttpContent { source }
             | Self::Run { source, .. }
             | Self::ExecuteHttpRequest { source, .. } => Some(source.as_ref()),
+            Self::Export { source, .. } => Some(source),
+            Self::ExportFailures { .. } => None,
         }
     }
 }
