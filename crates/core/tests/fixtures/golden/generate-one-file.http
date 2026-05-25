@@ -1,0 +1,30 @@
+@baseUrl = https://api.example.test/v1
+@contentType = application/json
+
+#################################################
+### Request: GET /pets/{petId}
+### Summary: Fetch a pet by id
+### Description: Returns one deterministic pet.
+#################################################
+
+### Path Parameter: Numeric pet identifier.
+@GetPet_petId = 0
+
+
+GET {{baseUrl}}/pets/{{GetPet_petId}}
+Content-Type: {{contentType}}
+
+
+##########################
+### Request: GET /search
+### Summary: Search pets
+##########################
+
+### Query Parameter: Search term.
+@GetSearchPets_q = str
+
+
+GET {{baseUrl}}/search?q={{GetSearchPets_q}}
+Content-Type: {{contentType}}
+
+

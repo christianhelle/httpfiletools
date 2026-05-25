@@ -1,0 +1,40 @@
+openapi: 3.0.3
+info:
+  title: Compatibility Fixture API
+  version: 1.0.0
+servers:
+  - url: https://api.example.test/v1
+paths:
+  /pets/{petId}:
+    get:
+      operationId: getPet
+      summary: Fetch a pet by id
+      description: Returns one deterministic pet.
+      tags:
+        - pets
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          description: Numeric pet identifier.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+  /search:
+    get:
+      operationId: searchPets
+      summary: Search pets
+      tags:
+        - pets
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
