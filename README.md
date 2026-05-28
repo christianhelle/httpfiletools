@@ -93,6 +93,17 @@ cargo fmt --all -- --check
 cargo test --workspace --quiet
 ```
 
+## Releasing to crates.io
+
+Publish the workspace crates in dependency order:
+
+```powershell
+cargo publish -p httpfiletools-core
+cargo publish -p httpfiletools
+```
+
+`httpfiletools` depends on `httpfiletools-core`, so the core crate must be available on crates.io before publishing the CLI crate.
+
 ## Compatibility tests
 
 The default test suite is deterministic and should not require external services. It includes fixture-based generator compatibility checks and a local in-process HTTP server for runner behavior.
