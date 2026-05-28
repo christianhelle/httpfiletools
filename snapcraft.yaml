@@ -1,6 +1,6 @@
 name: httpfiletools
 base: core24
-version: 0.1.0
+adopt-info: httpfiletools
 summary: Generate and run HTTP request files from one CLI
 description: |
   HTTP File Tools is a command-line tool written in Rust for generating and
@@ -33,6 +33,10 @@ parts:
   httpfiletools:
     plugin: rust
     source: .
+    override-pull: |
+      craftctl default
+      version="$(grep -E '^\s*version\s*=' crates/cli/Cargo.toml | head -n1 | cut -d '\"' -f2)"
+      craftctl set version="$version"
     override-build: |
       cargo build --release --package httpfiletools
       install -D -m755 target/release/httpfiletools $SNAPCRAFT_PART_INSTALL/bin/httpfiletools
