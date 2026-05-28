@@ -1,10 +1,12 @@
 [package]
 name = "httpfiletools"
 version = "0.1.0"
+description = "CLI for generating and running .http files from OpenAPI documents"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
 
 [[bin]]
 name = "httpfiletools"
@@ -12,4 +14,4 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
-httpfiletools-core = { path = "../core" }
+httpfiletools-core = { version = "0.1.0", path = "../core" }

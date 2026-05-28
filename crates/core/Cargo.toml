@@ -1,11 +1,12 @@
 [package]
 name = "httpfiletools-core"
 version = "0.1.0"
+description = "Core integration library for generating and running .http files"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
+readme = "../../README.md"
 
 [dependencies]
 anyhow.workspace = true

@@ -14,7 +14,7 @@ This project reuses the upstream engines directly:
 ## Workspace shape
 
 - `crates/cli` contains the public `httpfiletools` binary.
-- `crates/core` contains the private integration library used by the CLI.
+- `crates/core` contains the integration library used by the CLI.
 
 ## Commands
 
