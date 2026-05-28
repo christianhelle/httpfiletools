@@ -12,3 +12,17 @@ repository = "https://github.com/christianhelle/httpfiletools"
 anyhow = "1.0.101"
 httpgenerator-core = "1.1.0"
 httprunner-core = "0.9.51"
+
+[profile.dev]
+opt-level = 0       # No optimization for fastest compile times
+incremental = true  # Enable incremental compilation (caches unchanged code)
+codegen-units = 256 # Maximum parallelization for faster builds
+lto = false         # Disable LTO for faster linking
+debug = true        # Keep debug symbols for debugging
+
+[profile.release]
+opt-level = "z"   # Optimize for size
+lto = "fat"       # Enable aggressive Link Time Optimization
+codegen-units = 1 # Reduce parallel code generation for smaller binary
+panic = "abort"   # Abort on panic instead of unwinding
+strip = true      # Strip symbols from binary

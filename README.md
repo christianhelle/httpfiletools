@@ -14,7 +14,7 @@ This project reuses the upstream engines directly:
 ## Workspace shape
 
 - `src/cli` contains the public `httpfiletools` binary.
-- `src/core` contains the private integration library used by the CLI.
+- `src/core` contains the integration library used by the CLI.
 
 ## Commands
 
@@ -92,6 +92,17 @@ Install Rust 1.95 or newer. Common validation commands:
 cargo fmt --all -- --check
 cargo test --workspace --quiet
 ```
+
+## Releasing to crates.io
+
+Publish the workspace crates in dependency order:
+
+```powershell
+cargo publish -p httpfiletools-core
+cargo publish -p httpfiletools
+```
+
+`httpfiletools` depends on `httpfiletools-core`, so the core crate must be available on crates.io before publishing the CLI crate.
 
 ## Compatibility tests
 
