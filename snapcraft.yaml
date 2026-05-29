@@ -35,7 +35,7 @@ parts:
     source: .
     override-pull: |
       craftctl default
-      version="$(grep -E '^\s*version\s*=' crates/cli/Cargo.toml | head -n1 | cut -d '\"' -f2)"
+      version="$(grep -E '^\s*version\s*=' src/cli/Cargo.toml | head -n1 | cut -d '\"' -f2)"
       craftctl set version="$version"
     override-build: |
       cargo build --release --package httpfiletools

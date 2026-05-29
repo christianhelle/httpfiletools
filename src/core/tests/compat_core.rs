@@ -2,6 +2,7 @@ use std::{
     error::Error,
     io::{Read, Write},
     net::TcpListener,
+    path::PathBuf,
     sync::mpsc,
     thread,
     time::Duration,
@@ -13,11 +14,12 @@ use httpfiletools_core::{
 };
 
 fn fixture_path(relative: &str) -> String {
-    format!(
-        "{}\\tests\\fixtures\\{}",
-        env!("CARGO_MANIFEST_DIR"),
-        relative
-    )
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join(relative)
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn normalize_newlines(value: &str) -> String {
@@ -27,7 +29,7 @@ fn normalize_newlines(value: &str) -> String {
 #[test]
 fn generate_one_file_matches_golden_http_fixture() -> Result<(), Box<dyn Error>> {
     let request = GenerateRequest::with_options(
-        fixture_path("openapi\\compat-openapi.yaml"),
+        fixture_path("openapi/compat-openapi.yaml"),
         GenerateOptions {
             output_type: OutputType::OneFile,
             ..GenerateOptions::default()
@@ -48,8 +50,7 @@ fn generate_one_file_matches_golden_http_fixture() -> Result<(), Box<dyn Error>>
 
 #[test]
 fn invalid_openapi_fixture_reports_stable_generate_error_prefix() {
-    let request =
-        GenerateRequest::new(fixture_path("openapi\\invalid-missing-path-parameter.yaml"));
+    let request = GenerateRequest::new(fixture_path("openapi/invalid-missing-path-parameter.yaml"));
 
     let error = generate_http_files(&request).expect_err("invalid OpenAPI should fail");
     let message = error.to_string();
