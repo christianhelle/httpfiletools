@@ -41,6 +41,7 @@ pub struct RunOptions {
     pub pretty_json: bool,
     pub silent: bool,
     pub delay_ms: u64,
+    pub fail_fast: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,7 +58,8 @@ pub fn run_http_files(request: &RunRequest) -> Result<ProcessorResults> {
         .with_insecure(request.options.insecure)
         .with_pretty_json(request.options.pretty_json)
         .with_silent(request.options.silent)
-        .with_delay(request.options.delay_ms);
+        .with_delay(request.options.delay_ms)
+        .with_fail_fast(request.options.fail_fast);
 
     httprunner_core::processor::process_http_files_with_silent(&config).map_err(|source| {
         HttpFileToolsError::Run {
@@ -160,6 +162,28 @@ mod tests {
         );
 
         let result = run_http_files(&request).expect("empty run succeeds upstream");
+
+        assert!(result.success);
+        assert!(result.files.is_empty());
+    }
+
+    #[test]
+    fn run_options_default_disables_fail_fast() {
+        assert!(!RunOptions::default().fail_fast);
+    }
+
+    #[test]
+    fn run_http_files_honors_fail_fast_option() {
+        let request = RunRequest::with_options(
+            Vec::<String>::new(),
+            RunOptions {
+                silent: true,
+                fail_fast: true,
+                ..RunOptions::default()
+            },
+        );
+
+        let result = run_http_files(&request).expect("empty fail-fast run succeeds upstream");
 
         assert!(result.success);
         assert!(result.files.is_empty());
