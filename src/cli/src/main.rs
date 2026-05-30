@@ -150,6 +150,9 @@ struct RunArgs {
 
     #[arg(long = "delay", value_name = "MILLISECONDS", default_value_t = 0)]
     delay: u64,
+
+    #[arg(long = "fail-fast", action = clap::ArgAction::SetTrue)]
+    fail_fast: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
@@ -326,6 +329,7 @@ fn run_run(args: RunArgs) -> Result<ExitCode, Box<dyn std::error::Error>> {
             pretty_json: args.pretty_json,
             silent: args.no_banner,
             delay_ms: args.delay,
+            fail_fast: args.fail_fast,
         },
     );
 
