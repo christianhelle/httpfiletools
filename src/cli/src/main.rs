@@ -106,52 +106,65 @@ struct GenerateArgs {
 
 #[derive(Debug, Parser)]
 struct RunArgs {
-    #[arg(value_name = "FILE", conflicts_with = "discover")]
+    #[arg(
+        value_name = "FILE",
+        conflicts_with = "discover",
+        help = "One or more .http files to process"
+    )]
     files: Vec<String>,
 
-    #[arg(short = 'v', long = "verbose", action = clap::ArgAction::SetTrue)]
+    #[arg(short = 'v', long = "verbose", action = clap::ArgAction::SetTrue, help = "Show detailed HTTP request and response information")]
     verbose: bool,
 
-    #[arg(long = "version", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "version", action = clap::ArgAction::SetTrue, help = "Print version information")]
     version: bool,
 
-    #[arg(long = "log", value_name = "FILENAME", num_args = 0..=1, default_missing_value = "log")]
+    #[arg(long = "log", value_name = "FILENAME", num_args = 0..=1, default_missing_value = "log", help = "Log output to a file (defaults to 'log' if no filename is specified)")]
     log: Option<String>,
 
-    #[arg(long = "env", value_name = "ENVIRONMENT")]
+    #[arg(
+        long = "env",
+        value_name = "ENVIRONMENT",
+        help = "Specify environment name to load variables from http-client.env.json"
+    )]
     environment: Option<String>,
 
-    #[arg(long = "insecure", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "insecure", action = clap::ArgAction::SetTrue, help = "Allow insecure HTTPS connections (accept invalid certificates and hostnames)")]
     insecure: bool,
 
-    #[arg(long = "discover", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "discover", action = clap::ArgAction::SetTrue, help = "Recursively discover and process all .http files from current directory")]
     discover: bool,
 
-    #[arg(long = "no-banner", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "no-banner", action = clap::ArgAction::SetTrue, help = "Do not show the donation banner")]
     no_banner: bool,
 
-    #[arg(long = "pretty-json", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "pretty-json", action = clap::ArgAction::SetTrue, help = "Pretty-print JSON payloads in verbose output")]
     pretty_json: bool,
 
-    #[arg(long = "report", value_name = "FORMAT", num_args = 0..=1, default_missing_value = "markdown", ignore_case = true)]
+    #[arg(long = "report", value_name = "FORMAT", num_args = 0..=1, default_missing_value = "markdown", ignore_case = true, help = "Generate summary report (default=markdown)")]
     report: Option<ReportFormatArg>,
 
-    #[arg(long = "export", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "export", action = clap::ArgAction::SetTrue, help = "Export requests and responses to files")]
     export: bool,
 
-    #[arg(long = "export-json", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "export-json", action = clap::ArgAction::SetTrue, help = "Export execution results as a JSON file")]
     export_json: bool,
 
-    #[arg(long = "include-secrets", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "include-secrets", action = clap::ArgAction::SetTrue, help = "Include sensitive headers and secret-like values in logs, reports, and exports")]
     include_secrets: bool,
 
-    #[arg(long = "no-telemetry", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "no-telemetry", action = clap::ArgAction::SetTrue, help = "Disable anonymous telemetry data collection")]
     no_telemetry: bool,
 
-    #[arg(long = "delay", value_name = "MILLISECONDS", default_value_t = 0)]
+    #[arg(
+        long = "delay",
+        value_name = "MILLISECONDS",
+        default_value_t = 0,
+        help = "Delay between requests in milliseconds (default: 0)"
+    )]
     delay: u64,
 
-    #[arg(long = "fail-fast", action = clap::ArgAction::SetTrue)]
+    #[arg(long = "fail-fast", action = clap::ArgAction::SetTrue, help = "Stop immediately on the first failed request and show its full details")]
     fail_fast: bool,
 }
 
