@@ -141,7 +141,7 @@ struct RunArgs {
     #[arg(long = "pretty-json", action = clap::ArgAction::SetTrue, help = "Pretty-print JSON payloads in verbose output")]
     pretty_json: bool,
 
-    #[arg(long = "report", value_name = "FORMAT", num_args = 0..=1, default_missing_value = "markdown", ignore_case = true, help = "Generate summary report (default=markdown)")]
+    #[arg(long = "report", value_name = "FORMAT", num_args = 0..=1, default_missing_value = "markdown", ignore_case = true, help = "Generate summary report (defaults to markdown when FORMAT is omitted)")]
     report: Option<ReportFormatArg>,
 
     #[arg(long = "export", action = clap::ArgAction::SetTrue, help = "Export requests and responses to files")]
@@ -150,10 +150,10 @@ struct RunArgs {
     #[arg(long = "export-json", action = clap::ArgAction::SetTrue, help = "Export execution results as a JSON file")]
     export_json: bool,
 
-    #[arg(long = "include-secrets", action = clap::ArgAction::SetTrue, help = "Include sensitive headers and secret-like values in logs, reports, and exports")]
+    #[arg(long = "include-secrets", action = clap::ArgAction::SetTrue, help = "Reserved for future use (currently has no effect)")]
     include_secrets: bool,
 
-    #[arg(long = "no-telemetry", action = clap::ArgAction::SetTrue, help = "Disable anonymous telemetry data collection")]
+    #[arg(long = "no-telemetry", action = clap::ArgAction::SetTrue, help = "Reserved for future use (currently has no effect)")]
     no_telemetry: bool,
 
     #[arg(
