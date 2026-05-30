@@ -11,7 +11,7 @@ repository = "https://github.com/christianhelle/httpfiletools"
 [workspace.dependencies]
 anyhow = "1.0.101"
 httpgenerator-core = "1.1.0"
-httprunner-core = "0.9.51"
+httprunner-core = "1.0.53"
 
 [profile.dev]
 opt-level = 0       # No optimization for fastest compile times

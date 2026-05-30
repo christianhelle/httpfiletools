@@ -81,6 +81,7 @@ Selected runner flags:
 - `--export`: export per-request results.
 - `--export-json`: export aggregate JSON results.
 - `--delay <milliseconds>`: delay between requests.
+- `--fail-fast`: stop running after the first failed request.
 
 `--include-secrets` and `--no-telemetry` are accepted for compatibility but do not currently change behavior.
 
